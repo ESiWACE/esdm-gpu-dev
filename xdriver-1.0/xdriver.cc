@@ -1,0 +1,477 @@
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <cfloat>          // for DBL_MAX
+#include <math.h>
+#include <time.h>
+#include <unistd.h>        // for gethostname
+#if defined(_OPENMP)
+#include <omp.h>
+#define TIMER_FUNCTION omp_get_wtime()
+#else
+#define TIMER_FUNCTION (double)clock()/CLOCKS_PER_SEC
+#endif
+#define __MAIN__
+#define STR_MAX_FILENAME 80
+#define STR_MAX_TEXT 80
+
+#include "compare.h"
+
+int test_varrayMinMaxMV (float *sarray, double *darray, int &nx, int &ny, int &niter,
+    int &cpuonly, int &gpuonly, int &singledata, int &doubledata,
+                double *stimecpu, double *stimegpu, double *dtimecpu, double *dtimegpu);
+
+int test_varrayMinMaxMV_noisnan (float *sarray, double *darray, int &nx, int &ny, int &niter,
+    int &cpuonly, int &gpuonly, int &singledata, int &doubledata,
+                double *stimecpu, double *stimegpu, double *dtimecpu, double *dtimegpu);
+
+int test_vert_interp_lev (float *sarray, double *darray, int &nx, int &ny, int &nlev, int &niter,
+    int &cpuonly, int &gpuonly, int &singledata, int &doubledata,
+                double *stimecpu, double *stimegpu, double *dtimecpu, double *dtimegpu);
+
+void timing_report (char routine[], char text[]);
+
+// Variables with global scope
+int nlev, nx, ny;
+int timingdata;
+int cpuonly, gpuonly, singledata, doubledata;
+double dtimecpu, dtimegpu, stimecpu, stimegpu;
+FILE *file_handle;
+
+int main (int argc, char *argv[]) {
+
+// Local variables
+  int errcount, i, ierr, irun, niter, nrun;
+  int debug, errlimit, help, restart, timingrun, unknown;
+  int nlevmax, nxmax, nymax;
+  int *nlevrun, *nxrun, *nyrun;
+  int do_noisnan, do_varrayMinMaxMV, do_vert_interp_lev;
+  double memusage;
+  double *darray;
+  float  *sarray;
+  char routine[STR_MAX_TEXT], text[STR_MAX_TEXT];
+  char datafn[STR_MAX_FILENAME], restartfn[STR_MAX_FILENAME], timingfn[STR_MAX_FILENAME];
+
+  memset(routine, '\0', sizeof(routine));
+  memset(text, '\0', sizeof(text));
+  memset(datafn, '\0', sizeof(datafn));
+  memset(restartfn, '\0', sizeof(restartfn));
+  memset(timingfn, '\0', sizeof(timingfn));
+
+  printf ("xdriver: timing harness for CDO operators\n");
+
+// Read steering data from a restart file if present
+
+  restart = 1;
+  strcpy(restartfn,".xdriverrc");
+  file_handle = fopen( restartfn, "r");
+  if(file_handle==NULL) {
+    restart = 0;
+  }
+  else {
+    ierr = fscanf(file_handle,"%i",&nx);
+    // printf("xdriver: design read from restart file %s\n",designname);
+    if ( ierr==EOF ) {
+      printf("xdriver: end of file reached reading from %s\n",restartfn);
+    }
+    else {
+      restart = 0;
+    }
+    fclose(file_handle);
+  }
+
+// Set default options and settings. Reminder false=0; true=1
+
+  nlev = 1;
+  nx = 1000;
+  ny = 500;
+  doubledata=1;
+  singledata=0;
+
+  cpuonly=0;
+  gpuonly=0;
+#ifdef DEBUG
+  debug=1;
+#else
+  debug=0;
+#endif
+  errcount=0;
+  errlimit=0;
+  niter=100;
+  nrun=0;
+  help=0;
+  timingrun=0;
+  do_noisnan=0;
+  do_varrayMinMaxMV = 0;
+  do_vert_interp_lev = 0;
+  memset(text, '\0', sizeof(text));
+  memset(timingfn, '\0', sizeof(timingfn));
+
+// Parse command arguments
+
+  for (i=1;i<argc;i++) {
+    unknown=1;
+    if ( (strlen(argv[i])==2 && !strcmp(argv[i],"-h")) ||
+         (strlen(argv[i])==5 && !strcmp(argv[i],"-help")) ) {
+      help=1;
+      unknown=0;
+    }
+    if ( strlen(argv[i])==8 && !strcmp(argv[i],"-cpuonly") ) {
+      cpuonly=1;
+      unknown=0;
+    }
+    if ( strlen(argv[i])==8 && !strcmp(argv[i],"-gpuonly") ) {
+      gpuonly=1;
+      unknown=0;
+    }
+    if ( strlen(argv[i])==7 && !strcmp(argv[i],"-double") ) {
+      doubledata=1;
+      unknown=0;
+    }
+    if ( strlen(argv[i])==strlen("-nodouble") && !strcmp(argv[i],"-nodouble") ) {
+      doubledata=0;
+      unknown=0;
+    }
+    if ( strlen(argv[i])==9 && !strcmp(argv[i],"-errlimit") ) {
+      if ( i+1>argc-1 ) {
+        printf("Error in \"-errlimit\" parameter: error limit missing\n");
+        errcount++;
+      }
+      else {
+        i++;
+        ierr = sscanf(argv[i],"%i",&errlimit);
+        if ( ierr!=1 ) {
+          printf("Error in \"-errlimit\" parameter: invalid number %s\n",argv[i]);
+          errcount++;
+        }
+      }
+      unknown=0;
+    }
+    if ( strlen(argv[i])==6 && !strcmp(argv[i],"-niter") ) {
+      if ( i+1>argc-1 ) {
+        printf("Error in \"-niter\" parameter: number of iterations missing\n");
+        errcount++;
+      }
+      else {
+        i++;
+        ierr = sscanf(argv[i],"%i",&niter);
+        if ( ierr!=1 ) {
+          printf("Error in \"-niter\" parameter: invalid number %s\n",argv[i]);
+          errcount++;
+        }
+      }
+      unknown=0;
+    }
+    if ( strlen(argv[i])==5 && !strcmp(argv[i],"-nlev") ) {
+      if ( i+1>argc-1 ) {
+        printf("Error in \"-nlev\" parameter: number of levels missing\n");
+        errcount++;
+      }
+      else {
+        i++;
+        ierr = sscanf(argv[i],"%i",&nlev);
+        if ( ierr!=1 ) {
+          printf("Error in \"-nlev\" parameter: invalid number %s\n",argv[i]);
+          errcount++;
+        }
+      }
+      unknown=0;
+    }
+    if ( strlen(argv[i])==3 && !strcmp(argv[i],"-nx") ) {
+      if ( i+1>argc-1 ) {
+        printf("Error in \"-nx\" parameter: x dimension missing\n");
+        errcount++;
+      }
+      else {
+        i++;
+        ierr = sscanf(argv[i],"%i",&nx);
+        if ( ierr!=1 ) {
+          printf("Error in \"-nx\" parameter: invalid number %s\n",argv[i]);
+          errcount++;
+        }
+      }
+      unknown=0;
+    }
+    if ( strlen(argv[i])==3 && !strcmp(argv[i],"-ny") ) {
+      if ( i+1>argc-1 ) {
+        printf("Error in \"-ny\" parameter: y dimension missing\n");
+        errcount++;
+      }
+      else {
+        i++;
+        ierr = sscanf(argv[i],"%i",&ny);
+        if ( ierr!=1 ) {
+          printf("Error in \"-ny\" parameter: invalid number %s\n",argv[i]);
+          errcount++;
+        }
+      }
+      unknown=0;
+    }
+    if ( strlen(argv[i])==8 && !strcmp(argv[i],"-noisnan") ) {
+      do_noisnan=1;
+      unknown=0;
+    }
+    if ( strlen(argv[i])==7 && !strcmp(argv[i],"-single") ) {
+      singledata=1;
+      unknown=0;
+    }
+    if ( strlen(argv[i])==strlen("-nosingle") && !strcmp(argv[i],"-nosingle") ) {
+      singledata=0;
+      unknown=0;
+    }
+    if ( strlen(argv[i])==2 && !strcmp(argv[i],"-t") ||
+         strlen(argv[i])==7 && !strcmp(argv[i],"-timing") ) {
+      if ( i+1>argc-1 ) {
+        printf("Error in \"-timing\" parameter: timing file name missing\n");
+        errcount++;
+      }
+      else {
+        i++;
+        strcpy(timingfn,argv[i]);
+        timingrun=1;
+      }
+      unknown=0;
+    }
+    if ( strlen(argv[i])==4 && !strcmp(argv[i],"-vmm") ||
+         strlen(argv[i])==15 && !strcmp(argv[i],"-varrayMinMaxMV") ) {
+      do_varrayMinMaxMV=1;
+      unknown=0;
+    }
+    if ( strlen(argv[i])==5 && !strcmp(argv[i],"-vert") ||
+         strlen(argv[i])==16 && !strcmp(argv[i],"-vert_interp_lev") ) {
+      do_vert_interp_lev=1;
+      unknown=0;
+    }
+    if ( unknown ) {
+      printf("Error: argument unrecognised %s\n",argv[i]);
+      errcount++;
+    }
+  } // loop over argc
+
+// Print help information
+
+  if ( help ) {
+    printf("usage: \"xdriver <operators> <options>\"\n");
+    printf("operators:\n");
+    printf("   -vmm                 varrayMinMaxMV\n");
+    printf("   -vert                vert_interp_lev\n");
+    printf("options:\n");
+    printf("   -nx                  Size of x dimension of data arrays\n");
+    printf("   -nx                  Size of x dimension of data arrays\n");
+    printf("   -nx                  Size of x dimension of data arrays\n");
+    printf("   -ny                  Size of y dimension of data arrays\n");
+    printf("   -cpuonly             Run using CPU code not on the GPU\n");
+    printf("   -gpuonly             Run using GPU code not on the CPU\n");
+    printf("   -double              Run with double precision data (default)\n");
+    printf("   -nodouble            Do not run with double precision data\n");
+    printf("   -errlimit <n>        maximum number of erroneous values to print\n");
+    printf("   -niter <n>           Number of iterations for timing\n");
+    printf("   -single              Run with single precision data\n");
+    printf("   -nosingle            Do not run with single precision data (default)\n");
+    printf("   -timing <file>       File containing list of data sizes for timing run\n");
+    printf("   -help                Print this help information\n");
+    exit(1);
+  }
+
+// Exit if there has been an error in parsing the arg list
+
+  if ( errcount ) {
+    exit(1);
+  }
+
+  printf ("xdriver: %i iterations for timing\n",niter);
+
+// Read a file of sizes for a timingrun
+
+  if ( timingrun ) {
+
+    file_handle = fopen( timingfn, "r");
+    if(file_handle==NULL) {
+      printf("xdriver: unable to read from timing file %s\n",timingfn);
+      exit (1);
+    }
+    else {
+
+//    Read the number of entries
+      ierr = fscanf(file_handle,"%i",&nrun);
+      if ( ierr==EOF ) {
+        printf("xdriver: end of file reached reading from %s\n",timingfn);
+        exit (1);
+      }
+      if ( ierr!=1 ) {
+        printf("xdriver: invalid input reading from %s\n",timingfn);
+        exit (1);
+      }
+      if ( nrun<=0 ) {
+        printf("xdriver: invalid nrun %i read from file %s\n",nrun,timingfn);
+        exit (1);
+      }
+      else {
+        int int1, int2, int3;
+        // char str1[STR_MAX_TEXT];
+        nlevrun = (int *)malloc(nrun*sizeof(int));
+        nxrun = (int *)malloc(nrun*sizeof(int));
+        nyrun = (int *)malloc(nrun*sizeof(int));
+        for (irun=0;irun<nrun;irun++) {
+          ierr = fscanf(file_handle,"%i %i %i",&int1,&int2,&int3);
+          if ( ierr==EOF ) {
+            printf("xdriver: end of file reached reading from %s\n",timingfn);
+            exit (1);
+          }
+          if ( ierr!=3 ) {
+            printf("xdriver: invalid input reading from %s\n",timingfn);
+            exit (1);
+          }
+          *(nlevrun+irun) = int1;
+          *(nxrun+irun) = int2;
+          *(nyrun+irun) = int3;
+        }
+      }
+
+//    Read the data file name, if present
+      ierr = fscanf(file_handle,"%s",datafn);
+      if ( ierr==EOF ) {
+        printf("xdriver: warning end of file reached reading from %s\n",timingfn);
+        exit (1);
+      }
+      if ( ierr!=1 ) {
+        printf("xdriver: invalid input reading from %s\n",timingfn);
+        exit (1);
+      }
+      fclose(file_handle);
+    }
+    file_handle = fopen( datafn, "w");
+    if(file_handle==NULL) {
+      timingdata = 0;
+    }
+    else {
+      timingdata = 1;
+    }
+  } // timingrun
+  else {
+
+// No timing run, load values for a single run
+
+    nrun = 1;
+    nlevrun = (int *)malloc(nrun*sizeof(int));
+    nxrun = (int *)malloc(nrun*sizeof(int));
+    nyrun = (int *)malloc(nrun*sizeof(int));
+    *(nlevrun) = nlev;
+    *(nxrun) = nx;
+    *(nyrun) = ny;
+  }
+
+// Find the maximum data sizes for array allocation
+
+  nlevmax = 0;
+  nxmax = 0;
+  nymax = 0;
+  for (irun=0;irun<nrun;irun++) {
+    if ( *(nlevrun+irun)>nlevmax ) nlevmax = *(nlevrun+irun);
+    if ( *(nxrun+irun)>nxmax ) nxmax = *(nxrun+irun);
+    if ( *(nyrun+irun)>nymax ) nymax = *(nyrun+irun);
+  }
+
+// Allocate the main data arrays
+
+  printf ("xdriver: allocating arrays %i x %i x %i\n",nlevmax,nxmax,nymax);
+  if ( doubledata ) {
+    memusage = nlevmax*nxmax*nymax*sizeof(double)/(1024.0*1024.0);
+    darray = (double*)malloc(nlevmax*nxmax*nymax*sizeof(double));
+    if ( darray == NULL ) {
+      printf("Error: malloc failed to find %f MB\n",memusage);
+    }
+    // Share memory for the double and single precision arrays
+    sarray = (float *) darray;
+  }
+  else if ( singledata ) {
+    memusage = nlevmax*nxmax*nymax*sizeof(float)/(1024.0*1024.0);
+    sarray = (float*)malloc(nlevmax*nxmax*nymax*sizeof(float));
+    if ( sarray == NULL ) {
+      printf("Error: malloc failed to find %f MB\n",memusage);
+    }
+  }
+  else {
+    printf("Error: neither single nor double precision selected\n");
+    exit(1);
+  }
+  printf ("xdriver: memory usage %f MB\n",memusage);
+
+  for (irun=0;irun<nrun;irun++) {
+
+    if ( timingrun ) {
+      nlev = *(nlevrun+irun);
+      nx = *(nxrun+irun);
+      ny = *(nyrun+irun);
+    }
+    printf ("xdriver: run %i array sizes %i x %i x %i\n",irun,nlev,nx,ny);
+
+//   Run tests as per the do_* flags
+
+    if ( !do_varrayMinMaxMV && !do_vert_interp_lev ) {
+      printf("WARNING: no operator selected, see -help\n");
+    }
+
+    if ( do_varrayMinMaxMV ) {
+      ierr = test_varrayMinMaxMV(sarray, darray, nx, ny, niter,
+          cpuonly, gpuonly, singledata, doubledata,
+          &stimecpu,&stimegpu,&dtimecpu,&dtimegpu);
+      if ( ierr ) {
+        printf ("xdriver: test_varrayMinMaxMV failed due to errors, ierr = %i\n",ierr);
+        exit (1);
+      }
+      strcpy(routine,"varrayMinMaxMV");
+      strcpy(text,"DBL_IS_EQUAL    with isnan");
+      timing_report(routine, text);
+    }
+
+    if ( do_varrayMinMaxMV && do_noisnan ) {
+      printf ("\n");
+      ierr = test_varrayMinMaxMV_noisnan(sarray, darray, nx, ny, niter,
+          cpuonly, gpuonly, singledata, doubledata,
+          &stimecpu,&stimegpu,&dtimecpu,&dtimegpu);
+      if ( ierr ) {
+        printf ("xdriver: test_varrayMinMaxMV failed due to errors, ierr = %i\n",ierr);
+        exit (1);
+      }
+      strcpy(routine,"varrayMinMaxMV");
+      strcpy(text,"DBL_IS_EQUAL without isnan");
+      timing_report(routine, text);
+
+    }
+
+    if ( do_vert_interp_lev ) {
+      ierr = test_vert_interp_lev(sarray, darray, nx, ny, nlev, niter,
+          cpuonly, gpuonly, singledata, doubledata,
+          &stimecpu,&stimegpu,&dtimecpu,&dtimegpu);
+      if ( ierr ) {
+        printf ("xdriver: test_vert_interp_lev failed due to errors, ierr = %i\n",ierr);
+        exit (1);
+      }
+      strcpy(routine,"vert_interp_lev");
+      strcpy(text,"                          ");
+      timing_report(routine, text);
+    }
+  }
+
+}
+
+void timing_report (char routine[], char text[]) {
+
+// Timing report
+
+  if ( singledata && !gpuonly ) 
+    printf ("%s, CPU, single, %s:  %f secs\n",routine,text,stimecpu);
+  if ( singledata && !cpuonly ) 
+    printf ("%s, GPU, single, %s:  %f secs\n",routine,text,stimegpu);
+  if ( doubledata && !gpuonly ) 
+    printf ("%s, CPU, double, %s:  %f secs\n",routine,text,dtimecpu);
+  if ( doubledata && !cpuonly ) 
+    printf ("%s, GPU, double, %s:  %f secs\n",routine,text,dtimegpu);
+
+  if ( timingdata ) {
+    fprintf(file_handle,"%s %i %i %i %f %f %f %f\n",routine,nlev,nx,ny,
+      stimecpu,stimegpu,dtimecpu,dtimegpu);
+  }
+}
+
