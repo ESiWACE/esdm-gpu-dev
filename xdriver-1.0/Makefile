@@ -11,8 +11,8 @@ PGCC = pgc++
 PGFLAGS = -O3 -fast
 PGACCFLAGS = -acc -ta=tesla,cc60 -Minfo=accel
 
-SRCS = xdriver.cc test_varrayMinMaxMV.cc test_varrayMinMaxMV_noisnan.cc \
-       test_vert_interp_lev.cc array.cc array_noisnan.cc interpolation.cc \
+SRCS = xdriver.cc test_varrayMinMaxMV.cc test_vert_interp_lev.cc \
+       array.cc interpolation.cc \
        dev_array.cc dev_interpolation.cc
 INCS = compare.h
 
@@ -38,4 +38,4 @@ pgi-debug:	$(SRCS) $(INCS)
 	$(PGCC) $(CDEBUG) -o xdriver-pgi-debug $(SRCS)
 
 clean:
-	rm -f *.o xdriver xdriver-gcc xdriver-gcc-acc xdriver-pgi xdriver-pgi-acc
+	rm -f xdriver xdriver-gcc xdriver-pgi
