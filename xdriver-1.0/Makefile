@@ -38,4 +38,4 @@ pgi-debug:	$(SRCS) $(INCS)
 	$(PGCC) $(CDEBUG) -o xdriver-pgi-debug $(SRCS)
 
 clean:
-	rm -f xdriver xdriver-gcc xdriver-pgi
+	rm -f *.o xdriver xdriver-gcc xdriver-gcc-acc xdriver-pgi xdriver-pgi-acc
