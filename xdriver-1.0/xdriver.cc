@@ -40,7 +40,7 @@ FILE *file_handle;
 int main (int argc, char *argv[]) {
 
 // Local variables
-  int errcount, i, ierr, irun, narray, niter, nrun;
+  int errcount, i, ierr, irun, narray, niter, nrun, safety;
 //int debug;
   int errlimit, help, restart, timingrun, unknown;
   int nlevmax, nxmax, nymax;
@@ -248,6 +248,19 @@ int main (int argc, char *argv[]) {
       }
       unknown=0;
     }
+    if ( strlen(argv[i])==3 && !strcmp(argv[i],"-to") ||
+         strlen(argv[i])==14 && !strcmp(argv[i],"-timing_output") ) {
+      if ( i+1>argc-1 ) {
+        printf("Error in \"-timing_output\" parameter: timing output file name missing\n");
+        errcount++;
+      }
+      else {
+        i++;
+        strcpy(datafn,argv[i]);
+        timingrun=1;
+      }
+      unknown=0;
+    }
     if ( strlen(argv[i])==4 && !strcmp(argv[i],"-vmm") ||
          strlen(argv[i])==15 && !strcmp(argv[i],"-varrayMinMaxMV") ) {
       do_varrayMinMaxMV=1;
@@ -269,27 +282,28 @@ int main (int argc, char *argv[]) {
   if ( help ) {
     printf("usage: \"xdriver <operators> <options>\"\n");
     printf("operators:\n");
-    printf("   -vmm                 varrayMinMaxMV\n");
-    printf("   -vert                vert_interp_lev\n");
+    printf("   -vmm                   varrayMinMaxMV\n");
+    printf("   -vert                  vert_interp_lev\n");
     printf("options:\n");
-    printf("   -nx                  Size of x dimension of data arrays\n");
-    printf("   -nx                  Size of x dimension of data arrays\n");
-    printf("   -nx                  Size of x dimension of data arrays\n");
-    printf("   -ny                  Size of y dimension of data arrays\n");
-    printf("   -cpuonly             Run using CPU code not on the GPU\n");
-    printf("   -gpuonly             Run using GPU code not on the CPU\n");
-    printf("   -double              Run with double precision data (default)\n");
-    printf("   -nodouble            Do not run with double precision data\n");
-    printf("   -errlimit <n>        maximum number of erroneous values to print\n");
-    printf("   -isnan               Use the equality test which also checks for NaNs (default)\n");
-    printf("   -noisnan             Do not check for NaNs\n");
-    printf("   -missval             Check data for missing values (default)\n");
-    printf("   -nomissval           Do not check data for missing values\n");
-    printf("   -niter <n>           Number of iterations for timing\n");
-    printf("   -single              Run with single precision data\n");
-    printf("   -nosingle            Do not run with single precision data (default)\n");
-    printf("   -timing <file>       File containing list of data sizes for timing run\n");
-    printf("   -help                Print this help information\n");
+    printf("   -nx                    Size of x dimension of data arrays\n");
+    printf("   -nx                    Size of x dimension of data arrays\n");
+    printf("   -nx                    Size of x dimension of data arrays\n");
+    printf("   -ny                    Size of y dimension of data arrays\n");
+    printf("   -cpuonly               Run using CPU code not on the GPU\n");
+    printf("   -gpuonly               Run using GPU code not on the CPU\n");
+    printf("   -double                Run with double precision data (default)\n");
+    printf("   -nodouble              Do not run with double precision data\n");
+    printf("   -errlimit <n>          Maximum number of erroneous values to print\n");
+    printf("   -isnan                 Use the equality test which checks for NaNs (default)\n");
+    printf("   -noisnan               Do not check for NaNs\n");
+    printf("   -missval               Check data for missing values (default)\n");
+    printf("   -nomissval             Do not check data for missing values\n");
+    printf("   -niter <n>             Number of iterations for timing\n");
+    printf("   -single                Run with single precision data\n");
+    printf("   -nosingle              Do not run with single precision data (default)\n");
+    printf("   -timing <file>         File containing list of data sizes for timing run\n");
+    printf("   -timing_output <file>  Output file for data from the timing run\n");
+    printf("   -help                  Print this help information\n");
     exit(1);
   }
 
@@ -365,7 +379,7 @@ int main (int argc, char *argv[]) {
       }
 
 //    Read the data file name, if present
-      ierr = fscanf(file_handle,"%s",datafn);
+      ierr = fscanf(file_handle,"%s",text);
       if ( ierr==EOF ) {
         printf("xdriver: warning end of file reached reading from %s\n",timingfn);
         exit (1);
@@ -374,7 +388,14 @@ int main (int argc, char *argv[]) {
         printf("xdriver: invalid input reading from %s\n",timingfn);
         exit (1);
       }
+//    Only overwrite the current value if not set from command line
+      if ( !strcmp(datafn,"") ) strcpy(datafn,text);
       fclose(file_handle);
+    }
+    file_handle = fopen( datafn, "r");
+    if(file_handle!=NULL) {
+      printf("xdriver: ERROR timing data file %s already exists\n",datafn);
+      exit(1);
     }
     file_handle = fopen( datafn, "w");
     if(file_handle==NULL) {
@@ -410,12 +431,13 @@ int main (int argc, char *argv[]) {
 
 // Allocate the main data arrays
 
+  safety = 2;
   narray = 1;
   if ( do_vert_interp_lev ) narray = 2;
   printf ("xdriver: allocating %i arrays %i x %i x %i\n",narray,nlevmax,nxmax,nymax);
   if ( doubledata ) {
-    memusage = narray*nlevmax*nxmax*nymax*sizeof(double)/(1024.0*1024.0);
-    darray = (double*)malloc(narray*nlevmax*nxmax*nymax*sizeof(double));
+    memusage = safety*narray*nlevmax*nxmax*nymax*sizeof(double)/(1024.0*1024.0);
+    darray = (double*)malloc(safety*narray*nlevmax*nxmax*nymax*sizeof(double));
     if ( darray == NULL ) {
       printf("Error: malloc failed to find %f MB\n",memusage);
     }
@@ -423,8 +445,8 @@ int main (int argc, char *argv[]) {
     sarray = (float *) darray;
   }
   else if ( singledata ) {
-    memusage = narray*nlevmax*nxmax*nymax*sizeof(float)/(1024.0*1024.0);
-    sarray = (float*)malloc(narray*nlevmax*nxmax*nymax*sizeof(float));
+    memusage = safety*narray*nlevmax*nxmax*nymax*sizeof(float)/(1024.0*1024.0);
+    sarray = (float*)malloc(safety*narray*nlevmax*nxmax*nymax*sizeof(float));
     if ( sarray == NULL ) {
       printf("Error: malloc failed to find %f MB\n",memusage);
     }
