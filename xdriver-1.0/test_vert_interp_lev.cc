@@ -15,7 +15,7 @@ int test_vert_interp_lev (float *sarray, double *darray, int &nx, int &ny, int &
     int &do_isnan, int &do_missval,
     double *stimecpu, double *stimegpu, double *dtimecpu, double *dtimegpu) {
 
-  int i, ierr, ilev, iter, j, k;
+  int i, ierr, ilev, iter, j;
   int n;
   size_t gridsize;
   double end, start;
@@ -24,7 +24,6 @@ int test_vert_interp_lev (float *sarray, double *darray, int &nx, int &ny, int &
   double *dvardata1, *dvardata2, dmissval;
   double *dlev_wgt1, *dlev_wgt2;
   int *lev_idx1, *lev_idx2;
-  double first, second;
 
 //printf ("test_vert_interp_lev: timing harness for CDO operator vert_interp_lev\n");
 //printf ("test_vert_interp_lev: nx %i ny %i niter %i\n",
@@ -34,8 +33,6 @@ int test_vert_interp_lev (float *sarray, double *darray, int &nx, int &ny, int &
 
   ierr = 0;
 
-  first = 0.0;
-  second = 0.0;
   n = nx*ny;
   gridsize = (size_t) n;
 
@@ -44,9 +41,9 @@ int test_vert_interp_lev (float *sarray, double *darray, int &nx, int &ny, int &
   slev_wgt1 = (float*)dlev_wgt1;
   slev_wgt2 = (float*)dlev_wgt2;
   svardata1 = sarray;
-  svardata2 = sarray+gridsize*nlev;
+  svardata2 = sarray;
   dvardata1 = darray;
-  dvardata2 = darray+gridsize*nlev;
+  dvardata2 = darray;
 
 // Setup the level arrays
   lev_idx1 = (int*)malloc(nlev*sizeof(int));
@@ -64,13 +61,11 @@ int test_vert_interp_lev (float *sarray, double *darray, int &nx, int &ny, int &
 
 // Fill the single precision data arrays with artificial data
 
-  for (k=0;k<nlev;k++) {
-    for (j=0;j<ny;j++) {
-      for (i=0;i<nx;i++) {
-        *(sarray+gridsize*k+j*nx+i) = i+j*j/1000.0;
-      }
-// printf ("%f %f %f %f %f\n",sarray[j][0],sarray[j][1],sarray[j][2],sarray[j][3],sarray[j][4]);
+  for (j=0;j<ny;j++) {
+    for (i=0;i<nx;i++) {
+      *(sarray+j*nx+i) = i+j*j/1000.0;
     }
+// printf ("%f %f %f %f %f\n",sarray[j][0],sarray[j][1],sarray[j][2],sarray[j][3],sarray[j][4]);
   }
 
 // Add in a couple of missing values
@@ -84,9 +79,15 @@ int test_vert_interp_lev (float *sarray, double *darray, int &nx, int &ny, int &
 // Set the weights
 
   for (ilev=0;ilev<nlev;ilev++) {
-    *(slev_wgt1+ilev) = 1.0+ilev*0.05;
-    *(slev_wgt2+ilev) = 1.0-ilev*0.05;
+    *(slev_wgt1+ilev) = 0.5+ilev*0.05;
+    *(slev_wgt2+ilev) = 0.5-ilev*0.05;
   }
+/*
+  for (ilev=0;ilev<nlev;ilev++) {
+    printf("Levels %i %i    Weights %f %f\n",*(lev_idx1+ilev),*(lev_idx2+ilev),
+      *(slev_wgt1+ilev),*(slev_wgt2+ilev));
+  }
+*/
 
 // CPU code, single precision, timing loop
 
@@ -119,8 +120,7 @@ int test_vert_interp_lev (float *sarray, double *darray, int &nx, int &ny, int &
 
     *stimecpu = end-start;
 
-    printf ("vert_interp_lev, CPU, single,                           : Min %f Max %f nMiss %i\n",
-      first,second,n);
+    printf ("vert_interp_lev, CPU, single,                           : TBD\n");
   }
 
 // GPU code, single precision, timing loop
@@ -154,8 +154,7 @@ int test_vert_interp_lev (float *sarray, double *darray, int &nx, int &ny, int &
 
     *stimegpu = end-start;
 
-    printf ("vert_interp_lev, GPU, single,                           : Min %f Max %f nMiss %i\n",
-      first,second,n);
+    printf ("vert_interp_lev, GPU, single,                           : TBD\n");
   }
 
 /*
@@ -178,8 +177,7 @@ printf("%i %i vardata1 capacity %i\n",gridsize,nlev,vardata1.capacity());
     end = TIMER_FUNCTION;
     *stimegpu = end-start;
 
-    printf ("vert_interp_lev, GPU, single, templated                 : Min %f Max %f nMiss %i\n",
-      first,second,n);
+    printf ("vert_interp_lev, GPU, single, templated                 : TBD\n",
   }
 */
 
@@ -191,12 +189,10 @@ printf("%i %i vardata1 capacity %i\n",gridsize,nlev,vardata1.capacity());
 
 // Fill the double precision data arrays with artificial data
 
-//n = nx*ny;
-  for (k=0;k<nlev;k++) {
-    for (j=0;j<ny;j++) {
-      for (i=0;i<nx;i++) {
-        *(darray+gridsize*k+j*nx+i) = i+j*j/1000.0;
-      }
+  n = nx*ny;
+  for (j=0;j<ny;j++) {
+    for (i=0;i<nx;i++) {
+      *(darray+j*nx+i) = i+j*j/1000.0;
     }
 // printf ("%f %f %f %f %f\n",darray[j][0],darray[j][1],darray[j][2],darray[j][3],darray[j][4]);
   }
@@ -212,8 +208,8 @@ printf("%i %i vardata1 capacity %i\n",gridsize,nlev,vardata1.capacity());
 // Set the weights
 
   for (ilev=0;ilev<nlev;ilev++) {
-    *(dlev_wgt1+ilev) = 1.0+ilev*0.05;
-    *(dlev_wgt2+ilev) = 1.0-ilev*0.05;
+    *(dlev_wgt1+ilev) = 0.5+ilev*0.05;
+    *(dlev_wgt2+ilev) = 0.5-ilev*0.05;
   }
 
 // CPU code, DOUBLE precision, timing loop
@@ -246,8 +242,7 @@ printf("%i %i vardata1 capacity %i\n",gridsize,nlev,vardata1.capacity());
 
     *dtimecpu = end-start;
 
-    printf ("vert_interp_lev, CPU, double,                           : Min %f Max %f nMiss %i\n",
-      first,second,n);
+    printf ("vert_interp_lev, CPU, double,                           : TBD\n");
   }
 
 // GPU code, DOUBLE precision, timing loop
@@ -280,8 +275,7 @@ printf("%i %i vardata1 capacity %i\n",gridsize,nlev,vardata1.capacity());
 
     *dtimegpu = end-start;
 
-    printf ("vert_interp_lev, GPU, double,                           : Min %f Max %f nMiss %i\n",
-      first,second,n);
+    printf ("vert_interp_lev, GPU, double,                           : TBD\n");
   }
 
   return ierr;
