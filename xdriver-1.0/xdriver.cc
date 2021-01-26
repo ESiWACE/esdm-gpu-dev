@@ -18,16 +18,14 @@
 #include "compare.h"
 
 int test_varrayMinMaxMV (float *sarray, double *darray, int &nx, int &ny, int &niter,
-    int &cpuonly, int &gpuonly, int &singledata, int &doubledata,
-                double *stimecpu, double *stimegpu, double *dtimecpu, double *dtimegpu);
-
-int test_varrayMinMaxMV_noisnan (float *sarray, double *darray, int &nx, int &ny, int &niter,
-    int &cpuonly, int &gpuonly, int &singledata, int &doubledata,
-                double *stimecpu, double *stimegpu, double *dtimecpu, double *dtimegpu);
+         int &cpuonly, int &gpuonly, int &singledata, int &doubledata,
+         int &do_isnan, int &do_missval,
+         double *stimecpu, double *stimegpu, double *dtimecpu, double *dtimegpu);
 
 int test_vert_interp_lev (float *sarray, double *darray, int &nx, int &ny, int &nlev, int &niter,
-    int &cpuonly, int &gpuonly, int &singledata, int &doubledata,
-                double *stimecpu, double *stimegpu, double *dtimecpu, double *dtimegpu);
+         int &cpuonly, int &gpuonly, int &singledata, int &doubledata,
+         int &do_isnan, int &do_missval,
+         double *stimecpu, double *stimegpu, double *dtimecpu, double *dtimegpu);
 
 void timing_report (char routine[], char text[]);
 
@@ -35,17 +33,19 @@ void timing_report (char routine[], char text[]);
 int nlev, nx, ny;
 int timingdata;
 int cpuonly, gpuonly, singledata, doubledata;
+int do_isnan, do_missval;
 double dtimecpu, dtimegpu, stimecpu, stimegpu;
 FILE *file_handle;
 
 int main (int argc, char *argv[]) {
 
 // Local variables
-  int errcount, i, ierr, irun, niter, nrun;
-  int debug, errlimit, help, restart, timingrun, unknown;
+  int errcount, i, ierr, irun, narray, niter, nrun;
+//int debug;
+  int errlimit, help, restart, timingrun, unknown;
   int nlevmax, nxmax, nymax;
   int *nlevrun, *nxrun, *nyrun;
-  int do_noisnan, do_varrayMinMaxMV, do_vert_interp_lev;
+  int do_varrayMinMaxMV, do_vert_interp_lev;
   double memusage;
   double *darray;
   float  *sarray;
@@ -66,11 +66,12 @@ int main (int argc, char *argv[]) {
   strcpy(restartfn,".xdriverrc");
   file_handle = fopen( restartfn, "r");
   if(file_handle==NULL) {
+    // printf("xdriver: restart file %s does not exist\n",restartfn);
     restart = 0;
   }
   else {
     ierr = fscanf(file_handle,"%i",&nx);
-    // printf("xdriver: design read from restart file %s\n",designname);
+    // printf("xdriver: options read from restart file %i\n",nx);
     if ( ierr==EOF ) {
       printf("xdriver: end of file reached reading from %s\n",restartfn);
     }
@@ -90,18 +91,21 @@ int main (int argc, char *argv[]) {
 
   cpuonly=0;
   gpuonly=0;
+/*
 #ifdef DEBUG
   debug=1;
 #else
   debug=0;
 #endif
+*/
   errcount=0;
   errlimit=0;
   niter=100;
   nrun=0;
   help=0;
   timingrun=0;
-  do_noisnan=0;
+  do_isnan=1;
+  do_missval=1;
   do_varrayMinMaxMV = 0;
   do_vert_interp_lev = 0;
   memset(text, '\0', sizeof(text));
@@ -207,8 +211,20 @@ int main (int argc, char *argv[]) {
       }
       unknown=0;
     }
+    if ( strlen(argv[i])==6 && !strcmp(argv[i],"-isnan") ) {
+      do_isnan=1;
+      unknown=0;
+    }
     if ( strlen(argv[i])==8 && !strcmp(argv[i],"-noisnan") ) {
-      do_noisnan=1;
+      do_isnan=0;
+      unknown=0;
+    }
+    if ( strlen(argv[i])==8 && !strcmp(argv[i],"-missval") ) {
+      do_missval=1;
+      unknown=0;
+    }
+    if ( strlen(argv[i])==10 && !strcmp(argv[i],"-nomissval") ) {
+      do_missval=0;
       unknown=0;
     }
     if ( strlen(argv[i])==7 && !strcmp(argv[i],"-single") ) {
@@ -265,6 +281,10 @@ int main (int argc, char *argv[]) {
     printf("   -double              Run with double precision data (default)\n");
     printf("   -nodouble            Do not run with double precision data\n");
     printf("   -errlimit <n>        maximum number of erroneous values to print\n");
+    printf("   -isnan               Use the equality test which also checks for NaNs (default)\n");
+    printf("   -noisnan             Do not check for NaNs\n");
+    printf("   -missval             Check data for missing values (default)\n");
+    printf("   -nomissval           Do not check data for missing values\n");
     printf("   -niter <n>           Number of iterations for timing\n");
     printf("   -single              Run with single precision data\n");
     printf("   -nosingle            Do not run with single precision data (default)\n");
@@ -280,6 +300,22 @@ int main (int argc, char *argv[]) {
   }
 
   printf ("xdriver: %i iterations for timing\n",niter);
+
+// Save options in a restart file
+
+  if ( restart ) { 
+    file_handle = fopen( restartfn, "w");
+    if(file_handle==NULL) {
+    }
+    else {
+      ierr = fprintf(file_handle,"%i %i %i\n",nx,ny,nlev);
+      if ( ierr!=1 ) {
+        printf("xdriver: error code %i unable to write to restart file %s\n",ierr,restartfn);
+      }
+      ierr = fwrite("\n",1,1,file_handle);
+    }
+    fclose(file_handle);
+  }
 
 // Read a file of sizes for a timingrun
 
@@ -350,7 +386,7 @@ int main (int argc, char *argv[]) {
   } // timingrun
   else {
 
-// No timing run, load values for a single run
+// No timing run, set values for a single run
 
     nrun = 1;
     nlevrun = (int *)malloc(nrun*sizeof(int));
@@ -374,10 +410,12 @@ int main (int argc, char *argv[]) {
 
 // Allocate the main data arrays
 
-  printf ("xdriver: allocating arrays %i x %i x %i\n",nlevmax,nxmax,nymax);
+  narray = 1;
+  if ( do_vert_interp_lev ) narray = 2;
+  printf ("xdriver: allocating %i arrays %i x %i x %i\n",narray,nlevmax,nxmax,nymax);
   if ( doubledata ) {
-    memusage = nlevmax*nxmax*nymax*sizeof(double)/(1024.0*1024.0);
-    darray = (double*)malloc(nlevmax*nxmax*nymax*sizeof(double));
+    memusage = narray*nlevmax*nxmax*nymax*sizeof(double)/(1024.0*1024.0);
+    darray = (double*)malloc(narray*nlevmax*nxmax*nymax*sizeof(double));
     if ( darray == NULL ) {
       printf("Error: malloc failed to find %f MB\n",memusage);
     }
@@ -385,8 +423,8 @@ int main (int argc, char *argv[]) {
     sarray = (float *) darray;
   }
   else if ( singledata ) {
-    memusage = nlevmax*nxmax*nymax*sizeof(float)/(1024.0*1024.0);
-    sarray = (float*)malloc(nlevmax*nxmax*nymax*sizeof(float));
+    memusage = narray*nlevmax*nxmax*nymax*sizeof(float)/(1024.0*1024.0);
+    sarray = (float*)malloc(narray*nlevmax*nxmax*nymax*sizeof(float));
     if ( sarray == NULL ) {
       printf("Error: malloc failed to find %f MB\n",memusage);
     }
@@ -415,6 +453,7 @@ int main (int argc, char *argv[]) {
     if ( do_varrayMinMaxMV ) {
       ierr = test_varrayMinMaxMV(sarray, darray, nx, ny, niter,
           cpuonly, gpuonly, singledata, doubledata,
+          do_isnan, do_missval,
           &stimecpu,&stimegpu,&dtimecpu,&dtimegpu);
       if ( ierr ) {
         printf ("xdriver: test_varrayMinMaxMV failed due to errors, ierr = %i\n",ierr);
@@ -425,24 +464,10 @@ int main (int argc, char *argv[]) {
       timing_report(routine, text);
     }
 
-    if ( do_varrayMinMaxMV && do_noisnan ) {
-      printf ("\n");
-      ierr = test_varrayMinMaxMV_noisnan(sarray, darray, nx, ny, niter,
-          cpuonly, gpuonly, singledata, doubledata,
-          &stimecpu,&stimegpu,&dtimecpu,&dtimegpu);
-      if ( ierr ) {
-        printf ("xdriver: test_varrayMinMaxMV failed due to errors, ierr = %i\n",ierr);
-        exit (1);
-      }
-      strcpy(routine,"varrayMinMaxMV");
-      strcpy(text,"DBL_IS_EQUAL without isnan");
-      timing_report(routine, text);
-
-    }
-
     if ( do_vert_interp_lev ) {
       ierr = test_vert_interp_lev(sarray, darray, nx, ny, nlev, niter,
           cpuonly, gpuonly, singledata, doubledata,
+          do_isnan, do_missval,
           &stimecpu,&stimegpu,&dtimecpu,&dtimegpu);
       if ( ierr ) {
         printf ("xdriver: test_vert_interp_lev failed due to errors, ierr = %i\n",ierr);
@@ -459,6 +484,16 @@ int main (int argc, char *argv[]) {
 void timing_report (char routine[], char text[]) {
 
 // Timing report
+
+  if ( do_isnan && do_missval ) {
+    strcpy(text,"with    isnan, with    missval");
+  }
+  else if ( do_missval ) {
+    strcpy(text,"without isnan, with    missval");
+  }
+  else {
+    strcpy(text,"without isnan, without missval");
+  }
 
   if ( singledata && !gpuonly ) 
     printf ("%s, CPU, single, %s:  %f secs\n",routine,text,stimecpu);
