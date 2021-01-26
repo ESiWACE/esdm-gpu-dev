@@ -205,6 +205,47 @@ CPUs_vert_interp_lev_nomissval(const size_t gridsize, const float missval,
 }
 
 void
+GPUs_vert_interp_lev(const size_t gridsize, const float missval,
+	       	float *vardata1, float *vardata2,
+	       	const int nlev2, const int *lev_idx1, const int *lev_idx2,
+                const float *lev_wgt1, const float *lev_wgt2)
+{
+/*
+  for (int ilev = 0; ilev < nlev2; ++ilev)
+    {
+      for (size_t i = 0; i < gridsize; ++i)
+        {
+printf("GPU before %f %f\n",*(vardata1+gridsize*lev_idx1[ilev]+i), *(vardata1+gridsize*lev_idx2[ilev]+i));
+        }
+    }
+*/
+#pragma acc data copyin(vardata1[:gridsize*nlev2])
+#pragma acc data copyout(vardata2[:gridsize*nlev2])
+#pragma acc parallel loop collapse(2)
+  for (int ilev = 0; ilev < nlev2; ++ilev)
+    {
+#ifdef _OPENMP
+#pragma omp parallel for default(none) shared(gridsize, var2, var1L1, var1L2, missval, wgt1, wgt2)
+#endif
+//#pragma acc parallel loop
+      for (size_t i = 0; i < gridsize; ++i)
+        {
+          *(vardata2+gridsize*ilev+i) = s_vert_interp_lev_kernel_noisnan(lev_wgt1[ilev], lev_wgt2[ilev], 
+          *(vardata1+gridsize*lev_idx1[ilev]+i), *(vardata1+gridsize*lev_idx2[ilev]+i), missval);
+        }
+    }
+/*
+  for (int ilev = 0; ilev < nlev2; ++ilev)
+    {
+      for (size_t i = 0; i < gridsize; ++i)
+        {
+printf("GPU after  %f\n", *(vardata2+gridsize*ilev+i));
+        }
+    }
+*/
+}
+
+void
 CPUd_vert_interp_lev_original(const size_t gridsize, const double missval,
 	       	double *vardata1, double *vardata2,
 	       	const int nlev2, const int *lev_idx1, const int *lev_idx2,
@@ -327,7 +368,7 @@ printf("CPU after  %f\n", *(vardata2+gridsize*ilev+i));
 }
 
 void
-GPUs_vert_interp_lev(const size_t gridsize, const float missval,
+GPUs_vert_interp_lev_original(const size_t gridsize, const float missval,
 	       	float *vardata1, float *vardata2,
 	       	const int nlev2, const int *lev_idx1, const int *lev_idx2,
                 const float *lev_wgt1, const float *lev_wgt2)
@@ -503,43 +544,19 @@ printf("GPU before %f %f\n",*(vardata1+gridsize*lev_idx1[ilev]+i), *(vardata1+gr
         }
     }
 */
-//#pragma acc data copyout(vardata2[:gridsize*nlev2])
-//#pragma acc parallel loop collapse(2)
+#pragma acc data copyin(vardata1[:gridsize*nlev2])
+#pragma acc data copyout(vardata2[:gridsize*nlev2])
+#pragma acc parallel loop collapse(2)
   for (int ilev = 0; ilev < nlev2; ++ilev)
     {
 #ifdef _OPENMP
 #pragma omp parallel for default(none) shared(gridsize, var2, var1L1, var1L2, missval, wgt1, wgt2)
 #endif
-#pragma acc parallel loop
+//#pragma acc parallel loop
       for (size_t i = 0; i < gridsize; ++i)
         {
-          *(vardata2+gridsize*ilev+i) = d_vert_interp_lev_kernel(lev_wgt1[ilev], lev_wgt2[ilev], 
+          *(vardata2+gridsize*ilev+i) = d_vert_interp_lev_kernel_noisnan(lev_wgt1[ilev], lev_wgt2[ilev], 
           *(vardata1+gridsize*lev_idx1[ilev]+i), *(vardata1+gridsize*lev_idx2[ilev]+i), missval);
-// MA manual inline
-/*
-  double w1 = lev_wgt1[ilev];
-  double w2 = lev_wgt2[ilev];
-  if (IS_EQUAL(*(vardata1+gridsize*lev_idx2[ilev]+i), missval)) w1 = 0;
-  if (IS_EQUAL(*(vardata1+gridsize*lev_idx1[ilev]+i), missval)) w2 = 0;
-
-  if (IS_EQUAL(w1, 0) && IS_EQUAL(w2, 0))
-    {
-      *(vardata2+gridsize*ilev+i) = missval;
-    }
-  else if (IS_EQUAL(w1, 0))
-    {
-      *(vardata2+gridsize*ilev+i) = (w2 >= 0.5) ? *(vardata1+gridsize*lev_idx1[ilev]+i) : missval;
-    }
-  else if (IS_EQUAL(w2, 0))
-    {
-      *(vardata2+gridsize*ilev+i) = (w1 >= 0.5) ? *(vardata1+gridsize*lev_idx2[ilev]+i) : missval;
-    }
-  else
-    {
-      *(vardata2+gridsize*ilev+i) = 
-        *(vardata1+gridsize*lev_idx2[ilev]+i) * w1 + *(vardata1+gridsize*lev_idx1[ilev]+i) * w2;
-    }
-*/
         }
     }
 /*
@@ -553,33 +570,6 @@ printf("GPU after  %f\n", *(vardata2+gridsize*ilev+i));
 */
 }
 
-void
-notest_GPUd_vert_interp_lev(const size_t gridsize, const double missval,
-	       	double *vardata1, double *vardata2,
-	       	const int nlev2, const int *lev_idx1, const int *lev_idx2,
-                const double *lev_wgt1, const double *lev_wgt2)
-{
-  for (int ilev = 0; ilev < nlev2; ++ilev)
-    {
-      const auto idx1 = lev_idx1[ilev];
-      const auto idx2 = lev_idx2[ilev];
-      auto wgt1 = lev_wgt1[ilev];
-      auto wgt2 = lev_wgt2[ilev];
-      double *var2 = vardata2 + gridsize * ilev;
-      const double *var1L1 = vardata1 + gridsize * idx1;
-      const double *var1L2 = vardata1 + gridsize * idx2;
-
-#ifdef _OPENMP
-#pragma omp parallel for default(none) shared(gridsize, var2, var1L1, var1L2, missval, wgt1, wgt2)
-#endif
-#pragma acc parallel loop
-      for (size_t i = 0; i < gridsize; ++i)
-        {
-          var2[i] = var1L1[i] * wgt1 + var1L2[i] * wgt2;
-//        var2[i] = d_vert_interp_lev_kernel(wgt1, wgt2, var1L1[i], var1L2[i], missval);
-        }
-    }
-}
 
 /*
 
@@ -642,9 +632,6 @@ tiled_GPUd_vert_interp_lev(const size_t gridsize, const double missval,
   }
 }
 
-*/
-
-/*
 void
 mask_GPUd_vert_interp_lev(const size_t gridsize, const double missval,
 	       	double *vardata1, double *vardata2,
@@ -687,27 +674,29 @@ mask_GPUd_vert_interp_lev(const size_t gridsize, const double missval,
 
 // Original code or a version of it
 
-//        if (vardata1[i+gridsize*lev1]==missval) wgt1 = 0;
-//        if (vardata2[i+gridsize*lev2]==missval) wgt2 = 0;
+          if (vardata1[i+gridsize*lev1]==missval) wgt1 = 0;
+          if (vardata2[i+gridsize*lev2]==missval) wgt2 = 0;
 
-//        if ((wgt1==0) && (wgt2==0))
-//          {
-//            vardata2[i+gridsize*ilev] = missval;
-//          }
-//        else if (wgt1==0)
-//          {
-//            vardata2[i+gridsize*ilev] = (wgt2 >= 0.5) ? vardata2[i+gridsize*lev2] : missval;
-//          }
-//        else if (wgt2==0)
-//          {
-//            vardata2[i+gridsize*ilev] = (wgt1 >= 0.5) ? vardata1[i+gridsize*lev1] : missval;
-//          }
-//        else
-//          {
-//            vardata2[i+gridsize*ilev] = vardata1[i+gridsize*lev1] * wgt1 
-//                                      + vardata2[i+gridsize*lev2] * wgt2;
-//          }
+          if ((wgt1==0) && (wgt2==0))
+            {
+              vardata2[i+gridsize*ilev] = missval;
+            }
+          else if (wgt1==0)
+            {
+              vardata2[i+gridsize*ilev] = (wgt2 >= 0.5) ? vardata2[i+gridsize*lev2] : missval;
+            }
+          else if (wgt2==0)
+            {
+              vardata2[i+gridsize*ilev] = (wgt1 >= 0.5) ? vardata1[i+gridsize*lev1] : missval;
+            }
+          else
+            {
+              vardata2[i+gridsize*ilev] = vardata1[i+gridsize*lev1] * wgt1 
+                                        + vardata2[i+gridsize*lev2] * wgt2;
+            }
+//
         }
     }
 }
+
 */
