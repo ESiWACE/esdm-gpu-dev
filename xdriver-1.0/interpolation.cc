@@ -227,10 +227,9 @@ printf("GPU before %f %f\n",*(vardata1+gridsize*lev_idx1[ilev]+i), *(vardata1+gr
 #ifdef _OPENMP
 #pragma omp parallel for default(none) shared(gridsize, var2, var1L1, var1L2, missval, wgt1, wgt2)
 #endif
-//#pragma acc parallel loop
       for (size_t i = 0; i < gridsize; ++i)
         {
-          *(vardata2+gridsize*ilev+i) = s_vert_interp_lev_kernel_noisnan(lev_wgt1[ilev], lev_wgt2[ilev], 
+          *(vardata2+gridsize*ilev+i) = s_vert_interp_lev_kernel(lev_wgt1[ilev], lev_wgt2[ilev], 
           *(vardata1+gridsize*lev_idx1[ilev]+i), *(vardata1+gridsize*lev_idx2[ilev]+i), missval);
         }
     }
@@ -400,23 +399,18 @@ GPUs_vert_interp_lev_noisnan(const size_t gridsize, const float missval,
 	       	const int nlev2, const int *lev_idx1, const int *lev_idx2,
                 const float *lev_wgt1, const float *lev_wgt2)
 {
+#pragma acc data copyin(vardata1[:gridsize*nlev2])
+#pragma acc data copyout(vardata2[:gridsize*nlev2])
+#pragma acc parallel loop collapse(2)
   for (int ilev = 0; ilev < nlev2; ++ilev)
     {
-      const auto idx1 = lev_idx1[ilev];
-      const auto idx2 = lev_idx2[ilev];
-      auto wgt1 = lev_wgt1[ilev];
-      auto wgt2 = lev_wgt2[ilev];
-      float *var2 = vardata2 + gridsize * ilev;
-      const float *var1L1 = vardata1 + gridsize * idx1;
-      const float *var1L2 = vardata1 + gridsize * idx2;
-
 #ifdef _OPENMP
 #pragma omp parallel for default(none) shared(gridsize, var2, var1L1, var1L2, missval, wgt1, wgt2)
 #endif
-#pragma acc parallel loop
       for (size_t i = 0; i < gridsize; ++i)
         {
-          var2[i] = s_vert_interp_lev_kernel_noisnan(wgt1, wgt2, var1L1[i], var1L2[i], missval);
+          *(vardata2+gridsize*ilev+i) = s_vert_interp_lev_kernel_noisnan(lev_wgt1[ilev], lev_wgt2[ilev], 
+          *(vardata1+gridsize*lev_idx1[ilev]+i), *(vardata1+gridsize*lev_idx2[ilev]+i), missval);
         }
     }
 }
@@ -427,23 +421,18 @@ GPUs_vert_interp_lev_nomissval(const size_t gridsize, const float missval,
 	       	const int nlev2, const int *lev_idx1, const int *lev_idx2,
                 const float *lev_wgt1, const float *lev_wgt2)
 {
+#pragma acc data copyin(vardata1[:gridsize*nlev2])
+#pragma acc data copyout(vardata2[:gridsize*nlev2])
+#pragma acc parallel loop collapse(2)
   for (int ilev = 0; ilev < nlev2; ++ilev)
     {
-      const auto idx1 = lev_idx1[ilev];
-      const auto idx2 = lev_idx2[ilev];
-      auto wgt1 = lev_wgt1[ilev];
-      auto wgt2 = lev_wgt2[ilev];
-      float *var2 = vardata2 + gridsize * ilev;
-      const float *var1L1 = vardata1 + gridsize * idx1;
-      const float *var1L2 = vardata1 + gridsize * idx2;
-
 #ifdef _OPENMP
 #pragma omp parallel for default(none) shared(gridsize, var2, var1L1, var1L2, missval, wgt1, wgt2)
 #endif
-#pragma acc parallel loop
       for (size_t i = 0; i < gridsize; ++i)
         {
-          var2[i] = s_vert_interp_lev_kernel_nomissval(wgt1, wgt2, var1L1[i], var1L2[i], missval);
+          *(vardata2+gridsize*ilev+i) = s_vert_interp_lev_kernel_nomissval(lev_wgt1[ilev], lev_wgt2[ilev], 
+          *(vardata1+gridsize*lev_idx1[ilev]+i), *(vardata1+gridsize*lev_idx2[ilev]+i), missval);
         }
     }
 }
@@ -481,23 +470,18 @@ GPUd_vert_interp_lev_noisnan(const size_t gridsize, const double missval,
 	       	const int nlev2, const int *lev_idx1, const int *lev_idx2,
                 const double *lev_wgt1, const double *lev_wgt2)
 {
+#pragma acc data copyin(vardata1[:gridsize*nlev2])
+#pragma acc data copyout(vardata2[:gridsize*nlev2])
+#pragma acc parallel loop collapse(2)
   for (int ilev = 0; ilev < nlev2; ++ilev)
     {
-      const auto idx1 = lev_idx1[ilev];
-      const auto idx2 = lev_idx2[ilev];
-      auto wgt1 = lev_wgt1[ilev];
-      auto wgt2 = lev_wgt2[ilev];
-      double *var2 = vardata2 + gridsize * ilev;
-      const double *var1L1 = vardata1 + gridsize * idx1;
-      const double *var1L2 = vardata1 + gridsize * idx2;
-
 #ifdef _OPENMP
 #pragma omp parallel for default(none) shared(gridsize, var2, var1L1, var1L2, missval, wgt1, wgt2)
 #endif
-#pragma acc parallel loop
       for (size_t i = 0; i < gridsize; ++i)
         {
-          var2[i] = d_vert_interp_lev_kernel_noisnan(wgt1, wgt2, var1L1[i], var1L2[i], missval);
+          *(vardata2+gridsize*ilev+i) = d_vert_interp_lev_kernel_noisnan(lev_wgt1[ilev], lev_wgt2[ilev], 
+          *(vardata1+gridsize*lev_idx1[ilev]+i), *(vardata1+gridsize*lev_idx2[ilev]+i), missval);
         }
     }
 }
@@ -508,23 +492,18 @@ GPUd_vert_interp_lev_nomissval(const size_t gridsize, const double missval,
 	       	const int nlev2, const int *lev_idx1, const int *lev_idx2,
                 const double *lev_wgt1, const double *lev_wgt2)
 {
+#pragma acc data copyin(vardata1[:gridsize*nlev2])
+#pragma acc data copyout(vardata2[:gridsize*nlev2])
+#pragma acc parallel loop collapse(2)
   for (int ilev = 0; ilev < nlev2; ++ilev)
     {
-      const auto idx1 = lev_idx1[ilev];
-      const auto idx2 = lev_idx2[ilev];
-      auto wgt1 = lev_wgt1[ilev];
-      auto wgt2 = lev_wgt2[ilev];
-      double *var2 = vardata2 + gridsize * ilev;
-      const double *var1L1 = vardata1 + gridsize * idx1;
-      const double *var1L2 = vardata1 + gridsize * idx2;
-
 #ifdef _OPENMP
 #pragma omp parallel for default(none) shared(gridsize, var2, var1L1, var1L2, missval, wgt1, wgt2)
 #endif
-#pragma acc parallel loop
       for (size_t i = 0; i < gridsize; ++i)
         {
-          var2[i] = d_vert_interp_lev_kernel_nomissval(wgt1, wgt2, var1L1[i], var1L2[i], missval);
+          *(vardata2+gridsize*ilev+i) = d_vert_interp_lev_kernel_nomissval(lev_wgt1[ilev], lev_wgt2[ilev], 
+          *(vardata1+gridsize*lev_idx1[ilev]+i), *(vardata1+gridsize*lev_idx2[ilev]+i), missval);
         }
     }
 }
@@ -552,10 +531,9 @@ printf("GPU before %f %f\n",*(vardata1+gridsize*lev_idx1[ilev]+i), *(vardata1+gr
 #ifdef _OPENMP
 #pragma omp parallel for default(none) shared(gridsize, var2, var1L1, var1L2, missval, wgt1, wgt2)
 #endif
-//#pragma acc parallel loop
       for (size_t i = 0; i < gridsize; ++i)
         {
-          *(vardata2+gridsize*ilev+i) = d_vert_interp_lev_kernel_noisnan(lev_wgt1[ilev], lev_wgt2[ilev], 
+          *(vardata2+gridsize*ilev+i) = d_vert_interp_lev_kernel(lev_wgt1[ilev], lev_wgt2[ilev], 
           *(vardata1+gridsize*lev_idx1[ilev]+i), *(vardata1+gridsize*lev_idx2[ilev]+i), missval);
         }
     }
