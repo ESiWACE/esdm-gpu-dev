@@ -3,6 +3,18 @@
 
 #include <utility>         // for std::pair
 
+#define FFT_INTERNAL 0
+#define FFT_FFTW 1
+
+// functions for fft
+//
+void sfft(float *__restrict__ real, float *__restrict__ imag, int n, int sign);
+void dfft(double *__restrict__ real, double *__restrict__ imag, int n, int sign);
+//void CPUs_fft_fftw(const size_t fftsize, float *array);
+//void CPUd_fft_fftw(const size_t fftsize, double *array);
+//void GPUs_fft_fftw(const size_t fftsize, float *array);
+//void GPUd_fft_fftw(const size_t fftsize, double *array);
+
 // functions for varrayMinMaxMV
 
 std::pair<float, float>
