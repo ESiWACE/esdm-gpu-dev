@@ -59,223 +59,229 @@ int test_vert_interp_lev (float *sarray, double *darray, int &nx, int &ny, int &
 // SINGLE PRECISION
 // ------------------------------------------------------------------
 
+  if ( singledata ) {
+
 // Fill the single precision data arrays with artificial data
 
-  for (j=0;j<ny;j++) {
-    for (i=0;i<nx;i++) {
-      *(sarray+j*nx+i) = i+j*j/1000.0;
-    }
+    for (j=0;j<ny;j++) {
+      for (i=0;i<nx;i++) {
+        *(sarray+j*nx+i) = i+j*j/1000.0;
+      }
 // printf ("%f %f %f %f %f\n",sarray[j][0],sarray[j][1],sarray[j][2],sarray[j][3],sarray[j][4]);
-  }
+    }
 
 // Add in a couple of missing values
 
-  smissval = -999.0;
-  j = ny/2; i = nx/2;
-  *(sarray+j*nx+i) = smissval;
-  j = ny/3; i = nx/3;
-  *(sarray+j*nx+i) = smissval;
+    smissval = -999.0;
+    j = ny/2; i = nx/2;
+    *(sarray+j*nx+i) = smissval;
+    j = ny/3; i = nx/3;
+    *(sarray+j*nx+i) = smissval;
 
 // Set the weights
 
-  for (ilev=0;ilev<nlev;ilev++) {
-    *(slev_wgt1+ilev) = 0.5+ilev*0.05;
-    *(slev_wgt2+ilev) = 0.5-ilev*0.05;
-  }
+    for (ilev=0;ilev<nlev;ilev++) {
+      *(slev_wgt1+ilev) = 0.5+ilev*0.05;
+      *(slev_wgt2+ilev) = 0.5-ilev*0.05;
+    }
 /*
-  for (ilev=0;ilev<nlev;ilev++) {
-    printf("Levels %i %i    Weights %f %f\n",*(lev_idx1+ilev),*(lev_idx2+ilev),
-      *(slev_wgt1+ilev),*(slev_wgt2+ilev));
-  }
+    for (ilev=0;ilev<nlev;ilev++) {
+      printf("Levels %i %i    Weights %f %f\n",*(lev_idx1+ilev),*(lev_idx2+ilev),
+        *(slev_wgt1+ilev),*(slev_wgt2+ilev));
+    }
 */
 
 // CPU code, single precision, timing loop
 
-  if ( singledata && !gpuonly ) {
+    if ( !gpuonly ) {
 
-    if ( do_isnan && do_missval ) {
-      start = TIMER_FUNCTION;
-      for (iter=0;iter<niter;iter++ ) {
-        CPUs_vert_interp_lev( gridsize, smissval, svardata1, svardata2,
-                  nlev, lev_idx1, lev_idx2, slev_wgt1, slev_wgt2);
+      if ( do_isnan && do_missval ) {
+        start = TIMER_FUNCTION;
+        for (iter=0;iter<niter;iter++ ) {
+          CPUs_vert_interp_lev( gridsize, smissval, svardata1, svardata2,
+                    nlev, lev_idx1, lev_idx2, slev_wgt1, slev_wgt2);
+        }
+        end = TIMER_FUNCTION;
       }
-      end = TIMER_FUNCTION;
-    }
-    else if ( do_missval ) {
-      start = TIMER_FUNCTION;
-      for (iter=0;iter<niter;iter++ ) {
-        CPUs_vert_interp_lev_noisnan( gridsize, smissval, svardata1, svardata2,
-                  nlev, lev_idx1, lev_idx2, slev_wgt1, slev_wgt2);
+      else if ( do_missval ) {
+        start = TIMER_FUNCTION;
+        for (iter=0;iter<niter;iter++ ) {
+          CPUs_vert_interp_lev_noisnan( gridsize, smissval, svardata1, svardata2,
+                    nlev, lev_idx1, lev_idx2, slev_wgt1, slev_wgt2);
+        }
+        end = TIMER_FUNCTION;
       }
-      end = TIMER_FUNCTION;
-    }
-    else {
-      start = TIMER_FUNCTION;
-      for (iter=0;iter<niter;iter++ ) {
-        CPUs_vert_interp_lev_nomissval( gridsize, smissval, svardata1, svardata2,
-                  nlev, lev_idx1, lev_idx2, slev_wgt1, slev_wgt2);
+      else {
+        start = TIMER_FUNCTION;
+        for (iter=0;iter<niter;iter++ ) {
+          CPUs_vert_interp_lev_nomissval( gridsize, smissval, svardata1, svardata2,
+                    nlev, lev_idx1, lev_idx2, slev_wgt1, slev_wgt2);
+        }
+        end = TIMER_FUNCTION;
       }
-      end = TIMER_FUNCTION;
-    }
 
-    *stimecpu = end-start;
+      *stimecpu = end-start;
 
-    printf ("vert_interp_lev, CPU, single,                           : TBD\n");
-  }
+      printf ("vert_interp_lev, CPU, single,                           : TBD\n");
+    }
 
 // GPU code, single precision, timing loop
 
-  if ( singledata && !cpuonly ) {
+    if ( !cpuonly ) {
 
-    if ( do_isnan && do_missval ) {
-      start = TIMER_FUNCTION;
-      for (iter=0;iter<niter;iter++ ) {
-        GPUs_vert_interp_lev( gridsize, smissval, svardata1, svardata2,
-                  nlev, lev_idx1, lev_idx2, slev_wgt1, slev_wgt2);
+      if ( do_isnan && do_missval ) {
+        start = TIMER_FUNCTION;
+        for (iter=0;iter<niter;iter++ ) {
+          GPUs_vert_interp_lev( gridsize, smissval, svardata1, svardata2,
+                    nlev, lev_idx1, lev_idx2, slev_wgt1, slev_wgt2);
+        }
+        end = TIMER_FUNCTION;
       }
-      end = TIMER_FUNCTION;
-    }
-    else if ( do_missval ) {
-      start = TIMER_FUNCTION;
-      for (iter=0;iter<niter;iter++ ) {
-        GPUs_vert_interp_lev_noisnan( gridsize, smissval, svardata1, svardata2,
-                  nlev, lev_idx1, lev_idx2, slev_wgt1, slev_wgt2);
+      else if ( do_missval ) {
+        start = TIMER_FUNCTION;
+        for (iter=0;iter<niter;iter++ ) {
+          GPUs_vert_interp_lev_noisnan( gridsize, smissval, svardata1, svardata2,
+                    nlev, lev_idx1, lev_idx2, slev_wgt1, slev_wgt2);
+        }
+        end = TIMER_FUNCTION;
       }
-      end = TIMER_FUNCTION;
-    }
-    else {
-      start = TIMER_FUNCTION;
-      for (iter=0;iter<niter;iter++ ) {
-        GPUs_vert_interp_lev_nomissval( gridsize, smissval, svardata1, svardata2,
-                  nlev, lev_idx1, lev_idx2, slev_wgt1, slev_wgt2);
+      else {
+        start = TIMER_FUNCTION;
+        for (iter=0;iter<niter;iter++ ) {
+          GPUs_vert_interp_lev_nomissval( gridsize, smissval, svardata1, svardata2,
+                    nlev, lev_idx1, lev_idx2, slev_wgt1, slev_wgt2);
+        }
+        end = TIMER_FUNCTION;
       }
-      end = TIMER_FUNCTION;
-    }
 
-    *stimegpu = end-start;
+      *stimegpu = end-start;
 
-    printf ("vert_interp_lev, GPU, single,                           : TBD\n");
-  }
+      printf ("vert_interp_lev, GPU, single,                           : TBD\n");
+    }
 
 /*
-  if ( singledata && !cpuonly ) {
-    size_t nLev1 = (size_t) nlev;
-    size_t nLev2 = (size_t) nlev;
-    auto vardata1 = Varray<float>(gridsize*nlev,1);
+    if ( singledata && !cpuonly ) {
+      size_t nLev1 = (size_t) nlev;
+      size_t nLev2 = (size_t) nlev;
+      auto vardata1 = Varray<float>(gridsize*nlev,1);
 //  *vardata1 = svardata1;
-    auto vardata2 = Varray<float>(gridsize*nlev,1);
-    auto lev_idx = Varray<int>(nLev1,1);
-    auto lev_wgt = Varray<float>(nLev2,1);
+      auto vardata2 = Varray<float>(gridsize*nlev,1);
+      auto lev_idx = Varray<int>(nLev1,1);
+      auto lev_wgt = Varray<float>(nLev2,1);
 
 printf("%i %i vardata1 capacity %i\n",gridsize,nlev,vardata1.capacity());
-    start = TIMER_FUNCTION;
+      start = TIMER_FUNCTION;
 
-    for (iter=0;iter<niter;iter++ ) {
-      vert_interp_lev(gridsize, nLev1, smissval, vardata1, vardata2, nLev2, lev_idx, lev_wgt);
+      for (iter=0;iter<niter;iter++ ) {
+        vert_interp_lev(gridsize, nLev1, smissval, vardata1, vardata2, nLev2, lev_idx, lev_wgt);
+      }
+
+      end = TIMER_FUNCTION;
+      *stimegpu = end-start;
+
+      printf ("vert_interp_lev, GPU, single, templated                 : TBD\n",
     }
-
-    end = TIMER_FUNCTION;
-    *stimegpu = end-start;
-
-    printf ("vert_interp_lev, GPU, single, templated                 : TBD\n",
-  }
 */
 
-
+  }
 
 // ------------------------------------------------------------------
 // DOUBLE PRECISION
 // ------------------------------------------------------------------
 
+  if ( doubledata ) {
+
 // Fill the double precision data arrays with artificial data
 
-  n = nx*ny;
-  for (j=0;j<ny;j++) {
-    for (i=0;i<nx;i++) {
-      *(darray+j*nx+i) = i+j*j/1000.0;
-    }
+    n = nx*ny;
+    for (j=0;j<ny;j++) {
+      for (i=0;i<nx;i++) {
+        *(darray+j*nx+i) = i+j*j/1000.0;
+      }
 // printf ("%f %f %f %f %f\n",darray[j][0],darray[j][1],darray[j][2],darray[j][3],darray[j][4]);
-  }
+    }
 
 // Add in a couple of missing values
 
-  dmissval = -999.0;
-  j = ny/2; i = nx/2;
-  *(darray+j*nx+i) = dmissval;
-  j = ny/3; i = nx/3;
-  *(darray+j*nx+i) = dmissval;
+    dmissval = -999.0;
+    j = ny/2; i = nx/2;
+    *(darray+j*nx+i) = dmissval;
+    j = ny/3; i = nx/3;
+    *(darray+j*nx+i) = dmissval;
 
 // Set the weights
 
-  for (ilev=0;ilev<nlev;ilev++) {
-    *(dlev_wgt1+ilev) = 0.5+ilev*0.05;
-    *(dlev_wgt2+ilev) = 0.5-ilev*0.05;
-  }
+    for (ilev=0;ilev<nlev;ilev++) {
+      *(dlev_wgt1+ilev) = 0.5+ilev*0.05;
+      *(dlev_wgt2+ilev) = 0.5-ilev*0.05;
+    }
 
 // CPU code, DOUBLE precision, timing loop
 
-  if ( doubledata && !gpuonly ) {
-    if ( do_isnan && do_missval ) {
-      start = TIMER_FUNCTION;
-      for (iter=0;iter<niter;iter++ ) {
-        CPUd_vert_interp_lev( gridsize, dmissval, dvardata1, dvardata2,
-                  nlev, lev_idx1, lev_idx2, dlev_wgt1, dlev_wgt2);
+    if ( !gpuonly ) {
+      if ( do_isnan && do_missval ) {
+        start = TIMER_FUNCTION;
+        for (iter=0;iter<niter;iter++ ) {
+          CPUd_vert_interp_lev( gridsize, dmissval, dvardata1, dvardata2,
+                    nlev, lev_idx1, lev_idx2, dlev_wgt1, dlev_wgt2);
+        }
+        end = TIMER_FUNCTION;
       }
-      end = TIMER_FUNCTION;
-    }
-    else if ( do_missval ) {
-      start = TIMER_FUNCTION;
-      for (iter=0;iter<niter;iter++ ) {
-        CPUd_vert_interp_lev_noisnan( gridsize, dmissval, dvardata1, dvardata2,
-                  nlev, lev_idx1, lev_idx2, dlev_wgt1, dlev_wgt2);
+      else if ( do_missval ) {
+        start = TIMER_FUNCTION;
+        for (iter=0;iter<niter;iter++ ) {
+          CPUd_vert_interp_lev_noisnan( gridsize, dmissval, dvardata1, dvardata2,
+                    nlev, lev_idx1, lev_idx2, dlev_wgt1, dlev_wgt2);
+        }
+        end = TIMER_FUNCTION;
       }
-      end = TIMER_FUNCTION;
-    }
-    else {
-      start = TIMER_FUNCTION;
-      for (iter=0;iter<niter;iter++ ) {
-        CPUd_vert_interp_lev_nomissval( gridsize, dmissval, dvardata1, dvardata2,
-                  nlev, lev_idx1, lev_idx2, dlev_wgt1, dlev_wgt2);
+      else {
+        start = TIMER_FUNCTION;
+        for (iter=0;iter<niter;iter++ ) {
+          CPUd_vert_interp_lev_nomissval( gridsize, dmissval, dvardata1, dvardata2,
+                    nlev, lev_idx1, lev_idx2, dlev_wgt1, dlev_wgt2);
+        }
+        end = TIMER_FUNCTION;
       }
-      end = TIMER_FUNCTION;
-    }
 
-    *dtimecpu = end-start;
+      *dtimecpu = end-start;
 
-    printf ("vert_interp_lev, CPU, double,                           : TBD\n");
-  }
+      printf ("vert_interp_lev, CPU, double,                           : TBD\n");
+    }
 
 // GPU code, DOUBLE precision, timing loop
 
-  if ( doubledata && !cpuonly ) {
-    if ( do_isnan && do_missval ) {
-      start = TIMER_FUNCTION;
-      for (iter=0;iter<niter;iter++ ) {
-        GPUd_vert_interp_lev( gridsize, dmissval, dvardata1, dvardata2,
-                  nlev, lev_idx1, lev_idx2, dlev_wgt1, dlev_wgt2);
+    if ( !cpuonly ) {
+      if ( do_isnan && do_missval ) {
+        start = TIMER_FUNCTION;
+        for (iter=0;iter<niter;iter++ ) {
+          GPUd_vert_interp_lev( gridsize, dmissval, dvardata1, dvardata2,
+                    nlev, lev_idx1, lev_idx2, dlev_wgt1, dlev_wgt2);
+        }
+        end = TIMER_FUNCTION;
       }
-      end = TIMER_FUNCTION;
-    }
-    else if ( do_missval ) {
-      start = TIMER_FUNCTION;
-      for (iter=0;iter<niter;iter++ ) {
-        GPUd_vert_interp_lev_noisnan( gridsize, dmissval, dvardata1, dvardata2,
-                  nlev, lev_idx1, lev_idx2, dlev_wgt1, dlev_wgt2);
+      else if ( do_missval ) {
+        start = TIMER_FUNCTION;
+        for (iter=0;iter<niter;iter++ ) {
+          GPUd_vert_interp_lev_noisnan( gridsize, dmissval, dvardata1, dvardata2,
+                    nlev, lev_idx1, lev_idx2, dlev_wgt1, dlev_wgt2);
+        }
+        end = TIMER_FUNCTION;
       }
-      end = TIMER_FUNCTION;
-    }
-    else {
-      start = TIMER_FUNCTION;
-      for (iter=0;iter<niter;iter++ ) {
-        GPUd_vert_interp_lev_nomissval( gridsize, dmissval, dvardata1, dvardata2,
-                  nlev, lev_idx1, lev_idx2, dlev_wgt1, dlev_wgt2);
+      else {
+        start = TIMER_FUNCTION;
+        for (iter=0;iter<niter;iter++ ) {
+          GPUd_vert_interp_lev_nomissval( gridsize, dmissval, dvardata1, dvardata2,
+                    nlev, lev_idx1, lev_idx2, dlev_wgt1, dlev_wgt2);
+        }
+        end = TIMER_FUNCTION;
       }
-      end = TIMER_FUNCTION;
+
+      *dtimegpu = end-start;
+
+      printf ("vert_interp_lev, GPU, double,                           : TBD\n");
     }
 
-    *dtimegpu = end-start;
-
-    printf ("vert_interp_lev, GPU, double,                           : TBD\n");
   }
 
   return ierr;
