@@ -34,169 +34,177 @@ int test_varrayMinMaxMV (float *sarray, double *darray, int &nx, int &ny, int &n
 // SINGLE PRECISION
 // ------------------------------------------------------------------
 
+  if ( singledata ) {
+
 // Fill the single precision data arrays with artificial data
 
-  n = nx*ny;
-  nsize = (size_t) n;
-  for (j=0;j<ny;j++) {
-    for (i=0;i<nx;i++) {
-      *(sarray+j*nx+i) = i+j*j/1000.0;
-    }
+    n = nx*ny;
+    nsize = (size_t) n;
+    for (j=0;j<ny;j++) {
+      for (i=0;i<nx;i++) {
+        *(sarray+j*nx+i) = i+j*j/1000.0;
+      }
 // printf ("%f %f %f %f %f\n",sarray[j][0],sarray[j][1],sarray[j][2],sarray[j][3],sarray[j][4]);
-  }
+    }
 
 // Add in a couple of missing values
 
-  smissval = -999.0;
-  j = ny/2; i = nx/2;
-  *(sarray+j*nx+i) = smissval;
-  j = ny/3; i = nx/3;
-  *(sarray+j*nx+i) = smissval;
+    smissval = -999.0;
+    j = ny/2; i = nx/2;
+    *(sarray+j*nx+i) = smissval;
+    j = ny/3; i = nx/3;
+    *(sarray+j*nx+i) = smissval;
 
 // CPU code, single precision, timing loop
 
-  if ( singledata && !gpuonly ) {
+    if ( !gpuonly ) {
 
-    if ( do_isnan && do_missval ) {
-      start = TIMER_FUNCTION;
-      for (iter=0;iter<niter;iter++ ) {
-        sminmax = CPUs_varrayMinMaxMV(nsize,sarray,smissval,nm);
+      if ( do_isnan && do_missval ) {
+        start = TIMER_FUNCTION;
+        for (iter=0;iter<niter;iter++ ) {
+          sminmax = CPUs_varrayMinMaxMV(nsize,sarray,smissval,nm);
+        }
+        end = TIMER_FUNCTION;
       }
-      end = TIMER_FUNCTION;
-    }
-    else if ( do_missval ) {
-      start = TIMER_FUNCTION;
-      for (iter=0;iter<niter;iter++ ) {
-        sminmax = CPUs_varrayMinMaxMV_noisnan(nsize,sarray,smissval,nm);
+      else if ( do_missval ) {
+        start = TIMER_FUNCTION;
+        for (iter=0;iter<niter;iter++ ) {
+          sminmax = CPUs_varrayMinMaxMV_noisnan(nsize,sarray,smissval,nm);
+        }
+        end = TIMER_FUNCTION;
       }
-      end = TIMER_FUNCTION;
-    }
-    else {
-      start = TIMER_FUNCTION;
-      for (iter=0;iter<niter;iter++ ) {
-        sminmax = CPUs_varrayMinMaxMV_nomissval(nsize,sarray,smissval,nm);
+      else {
+        start = TIMER_FUNCTION;
+        for (iter=0;iter<niter;iter++ ) {
+          sminmax = CPUs_varrayMinMaxMV_nomissval(nsize,sarray,smissval,nm);
+        }
+        end = TIMER_FUNCTION;
       }
-      end = TIMER_FUNCTION;
-    }
-    *stimecpu = end-start;
+      *stimecpu = end-start;
 
-    printf ("varrayMinMaxMV, CPU, single, DBL_IS_EQUAL    with isnan: Min %f Max %f nMiss %i\n",
-      sminmax.first,sminmax.second,(int) (n-nm));
-  }
+      printf ("varrayMinMaxMV, CPU, single, DBL_IS_EQUAL    with isnan: Min %f Max %f nMiss %i\n",
+        sminmax.first,sminmax.second,(int) (n-nm));
+    }
 
 // GPU code, single precision, timing loop
 
-  if ( singledata && !cpuonly ) {
+    if ( !cpuonly ) {
 
-    if ( do_isnan && do_missval ) {
-      start = TIMER_FUNCTION;
-      for (iter=0;iter<niter;iter++ ) {
-        sminmax = GPUs_varrayMinMaxMV(nsize,sarray,smissval,nm);
+      if ( do_isnan && do_missval ) {
+        start = TIMER_FUNCTION;
+        for (iter=0;iter<niter;iter++ ) {
+          sminmax = GPUs_varrayMinMaxMV(nsize,sarray,smissval,nm);
+        }
+        end = TIMER_FUNCTION;
       }
-      end = TIMER_FUNCTION;
-    }
-    else if ( do_missval ) {
-      start = TIMER_FUNCTION;
-      for (iter=0;iter<niter;iter++ ) {
-        sminmax = GPUs_varrayMinMaxMV_noisnan(nsize,sarray,smissval,nm);
+      else if ( do_missval ) {
+        start = TIMER_FUNCTION;
+        for (iter=0;iter<niter;iter++ ) {
+          sminmax = GPUs_varrayMinMaxMV_noisnan(nsize,sarray,smissval,nm);
+        }
+        end = TIMER_FUNCTION;
       }
-      end = TIMER_FUNCTION;
-    }
-    else {
-      start = TIMER_FUNCTION;
-      for (iter=0;iter<niter;iter++ ) {
-        sminmax = GPUs_varrayMinMaxMV_nomissval(nsize,sarray,smissval,nm);
+      else {
+        start = TIMER_FUNCTION;
+        for (iter=0;iter<niter;iter++ ) {
+          sminmax = GPUs_varrayMinMaxMV_nomissval(nsize,sarray,smissval,nm);
+        }
+        end = TIMER_FUNCTION;
       }
-      end = TIMER_FUNCTION;
-    }
-    *stimegpu = end-start;
+      *stimegpu = end-start;
 
-    printf ("varrayMinMaxMV, GPU, single, DBL_IS_EQUAL    with isnan: Min %f Max %f nMiss %i\n",
-      sminmax.first,sminmax.second,(int) (n-nm));
+      printf ("varrayMinMaxMV, GPU, single, DBL_IS_EQUAL    with isnan: Min %f Max %f nMiss %i\n",
+        sminmax.first,sminmax.second,(int) (n-nm));
+    }
+
   }
 
 // ------------------------------------------------------------------
 // DOUBLE PRECISION
 // ------------------------------------------------------------------
 
+  if ( doubledata ) {
+
 // Fill the double precision data arrays with artificial data
 
-  n = nx*ny;
-  for (j=0;j<ny;j++) {
-    for (i=0;i<nx;i++) {
-      *(darray+j*nx+i) = i+j*j/1000.0;
-    }
+    n = nx*ny;
+    for (j=0;j<ny;j++) {
+      for (i=0;i<nx;i++) {
+        *(darray+j*nx+i) = i+j*j/1000.0;
+      }
 // printf ("%f %f %f %f %f\n",darray[j][0],darray[j][1],darray[j][2],darray[j][3],darray[j][4]);
-  }
+    }
 
 // Add in a couple of missing values
 
-  dmissval = -999.0;
-  j = ny/2; i = nx/2;
-  *(darray+j*nx+i) = dmissval;
-  j = ny/3; i = nx/3;
-  *(darray+j*nx+i) = dmissval;
+    dmissval = -999.0;
+    j = ny/2; i = nx/2;
+    *(darray+j*nx+i) = dmissval;
+    j = ny/3; i = nx/3;
+    *(darray+j*nx+i) = dmissval;
 
 // CPU code, DOUBLE precision, timing loop
 
-  if ( doubledata && !gpuonly ) {
+    if ( !gpuonly ) {
 
-    if ( do_isnan && do_missval ) {
-      start = TIMER_FUNCTION;
-      for (iter=0;iter<niter;iter++ ) {
-        dminmax = CPUd_varrayMinMaxMV(nsize,darray,dmissval,nm);
+      if ( do_isnan && do_missval ) {
+        start = TIMER_FUNCTION;
+        for (iter=0;iter<niter;iter++ ) {
+          dminmax = CPUd_varrayMinMaxMV(nsize,darray,dmissval,nm);
+        }
+        end = TIMER_FUNCTION;
       }
-      end = TIMER_FUNCTION;
-    }
-    else if ( do_missval ) {
-      start = TIMER_FUNCTION;
-      for (iter=0;iter<niter;iter++ ) {
-        dminmax = CPUd_varrayMinMaxMV_noisnan(nsize,darray,dmissval,nm);
+      else if ( do_missval ) {
+        start = TIMER_FUNCTION;
+        for (iter=0;iter<niter;iter++ ) {
+          dminmax = CPUd_varrayMinMaxMV_noisnan(nsize,darray,dmissval,nm);
+        }
+        end = TIMER_FUNCTION;
       }
-      end = TIMER_FUNCTION;
-    }
-    else {
-      start = TIMER_FUNCTION;
-      for (iter=0;iter<niter;iter++ ) {
-        dminmax = CPUd_varrayMinMaxMV_nomissval(nsize,darray,dmissval,nm);
+      else {
+        start = TIMER_FUNCTION;
+        for (iter=0;iter<niter;iter++ ) {
+          dminmax = CPUd_varrayMinMaxMV_nomissval(nsize,darray,dmissval,nm);
+        }
+        end = TIMER_FUNCTION;
       }
-      end = TIMER_FUNCTION;
-    }
-    *dtimecpu = end-start;
+      *dtimecpu = end-start;
 
-    printf ("varrayMinMaxMV, CPU, double, DBL_IS_EQUAL    with isnan: Min %f Max %f nMiss %i\n",
-      dminmax.first,dminmax.second,(int) (n-nm));
-  }
+      printf ("varrayMinMaxMV, CPU, double, DBL_IS_EQUAL    with isnan: Min %f Max %f nMiss %i\n",
+        dminmax.first,dminmax.second,(int) (n-nm));
+    }
 
 // GPU code, DOUBLE precision, timing loop
 
-  if ( doubledata && !cpuonly ) {
+    if ( !cpuonly ) {
 
-    if ( do_isnan && do_missval ) {
-      start = TIMER_FUNCTION;
-      for (iter=0;iter<niter;iter++ ) {
-        dminmax = GPUd_varrayMinMaxMV(nsize,darray,dmissval,nm);
+      if ( do_isnan && do_missval ) {
+        start = TIMER_FUNCTION;
+        for (iter=0;iter<niter;iter++ ) {
+          dminmax = GPUd_varrayMinMaxMV(nsize,darray,dmissval,nm);
+        }
+        end = TIMER_FUNCTION;
       }
-      end = TIMER_FUNCTION;
-    }
-    else if ( do_missval ) {
-      start = TIMER_FUNCTION;
-      for (iter=0;iter<niter;iter++ ) {
-        dminmax = GPUd_varrayMinMaxMV_noisnan(nsize,darray,dmissval,nm);
+      else if ( do_missval ) {
+        start = TIMER_FUNCTION;
+        for (iter=0;iter<niter;iter++ ) {
+          dminmax = GPUd_varrayMinMaxMV_noisnan(nsize,darray,dmissval,nm);
+        }
+        end = TIMER_FUNCTION;
       }
-      end = TIMER_FUNCTION;
-    }
-    else {
-      start = TIMER_FUNCTION;
-      for (iter=0;iter<niter;iter++ ) {
-        dminmax = GPUd_varrayMinMaxMV_nomissval(nsize,darray,dmissval,nm);
+      else {
+        start = TIMER_FUNCTION;
+        for (iter=0;iter<niter;iter++ ) {
+          dminmax = GPUd_varrayMinMaxMV_nomissval(nsize,darray,dmissval,nm);
+        }
+        end = TIMER_FUNCTION;
       }
-      end = TIMER_FUNCTION;
-    }
-    *dtimegpu = end-start;
+      *dtimegpu = end-start;
 
-    printf ("varrayMinMaxMV, GPU, double, DBL_IS_EQUAL    with isnan: Min %f Max %f nMiss %i\n",
-      dminmax.first,dminmax.second,(int) (n-nm));
+      printf ("varrayMinMaxMV, GPU, double, DBL_IS_EQUAL    with isnan: Min %f Max %f nMiss %i\n",
+        dminmax.first,dminmax.second,(int) (n-nm));
+    }
+
   }
 
   return ierr;
