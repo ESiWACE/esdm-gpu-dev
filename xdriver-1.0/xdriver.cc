@@ -16,6 +16,12 @@
 #define STR_MAX_TEXT 80
 
 #include "compare.h"
+#include "functions.h"
+
+int test_fft (float *sarray, double *darray, int &nx, int &ny, int &niter,
+         int &cpuonly, int &gpuonly, int &singledata, int &doubledata,
+         int &do_ffttype,
+         double *stimecpu, double *stimegpu, double *dtimecpu, double *dtimegpu);
 
 int test_varrayMinMaxMV (float *sarray, double *darray, int &nx, int &ny, int &niter,
          int &cpuonly, int &gpuonly, int &singledata, int &doubledata,
@@ -27,13 +33,13 @@ int test_vert_interp_lev (float *sarray, double *darray, int &nx, int &ny, int &
          int &do_isnan, int &do_missval,
          double *stimecpu, double *stimegpu, double *dtimecpu, double *dtimegpu);
 
-void timing_report (char routine[], char text[]);
+void timing_report (char routine[]);
 
 // Variables with global scope
 int nlev, nx, ny;
 int timingdata;
 int cpuonly, gpuonly, singledata, doubledata;
-int do_isnan, do_missval;
+int do_ffttype, do_isnan, do_missval;
 double dtimecpu, dtimegpu, stimecpu, stimegpu;
 FILE *file_handle;
 
@@ -45,7 +51,7 @@ int main (int argc, char *argv[]) {
   int errlimit, help, restart, timingrun, unknown;
   int nlevmax, nxmax, nymax;
   int *nlevrun, *nxrun, *nyrun;
-  int do_varrayMinMaxMV, do_vert_interp_lev;
+  int do_fft, do_varrayMinMaxMV, do_vert_interp_lev;
   double memusage;
   double *darray;
   float  *sarray;
@@ -106,8 +112,10 @@ int main (int argc, char *argv[]) {
   timingrun=0;
   do_isnan=1;
   do_missval=1;
-  do_varrayMinMaxMV = 0;
-  do_vert_interp_lev = 0;
+  do_fft=0;
+  do_ffttype=FFT_FFTW;
+  do_varrayMinMaxMV=0;
+  do_vert_interp_lev=0;
   memset(text, '\0', sizeof(text));
   memset(timingfn, '\0', sizeof(timingfn));
 
@@ -149,6 +157,19 @@ int main (int argc, char *argv[]) {
           errcount++;
         }
       }
+      unknown=0;
+    }
+    if ( strlen(argv[i])==4 && !strcmp(argv[i],"-fft") ) {
+      do_fft=1;
+      unknown=0;
+    }
+    if ( strlen(argv[i])==5 && !strcmp(argv[i],"-ffti") ||
+         strlen(argv[i])==12 && !strcmp(argv[i],"-fftinternal") ) {
+      do_ffttype=FFT_INTERNAL;
+      unknown=0;
+    }
+    if ( strlen(argv[i])==5 && !strcmp(argv[i],"-fftw") ) {
+      do_ffttype=FFT_FFTW;
       unknown=0;
     }
     if ( strlen(argv[i])==6 && !strcmp(argv[i],"-niter") ) {
@@ -282,6 +303,7 @@ int main (int argc, char *argv[]) {
   if ( help ) {
     printf("usage: \"xdriver <operators> <options>\"\n");
     printf("operators:\n");
+    printf("   -fft                   FFT kernel\n");
     printf("   -vmm                   varrayMinMaxMV\n");
     printf("   -vert                  vert_interp_lev\n");
     printf("options:\n");
@@ -434,6 +456,8 @@ int main (int argc, char *argv[]) {
   safety = 2;
   narray = 1;
   if ( do_vert_interp_lev ) narray = 2;
+// For FFTs we need two arrays of complex data
+  if ( do_fft ) narray = 4;
   printf ("xdriver: allocating %i arrays %i x %i x %i\n",narray,nlevmax,nxmax,nymax);
   if ( doubledata ) {
     memusage = safety*narray*nlevmax*nxmax*nymax*sizeof(double)/(1024.0*1024.0);
@@ -468,8 +492,21 @@ int main (int argc, char *argv[]) {
 
 //   Run tests as per the do_* flags
 
-    if ( !do_varrayMinMaxMV && !do_vert_interp_lev ) {
+    if ( !do_fft && !do_varrayMinMaxMV && !do_vert_interp_lev ) {
       printf("WARNING: no operator selected, see -help\n");
+    }
+
+    if ( do_fft ) {
+      ierr = test_fft(sarray, darray, nx, ny, niter,
+          cpuonly, gpuonly, singledata, doubledata,
+          do_ffttype,
+          &stimecpu,&stimegpu,&dtimecpu,&dtimegpu);
+      if ( ierr ) {
+        printf ("xdriver: test_fft failed due to errors, ierr = %i\n",ierr);
+        exit (1);
+      }
+      strcpy(routine,"fft");
+      timing_report(routine);
     }
 
     if ( do_varrayMinMaxMV ) {
@@ -482,8 +519,7 @@ int main (int argc, char *argv[]) {
         exit (1);
       }
       strcpy(routine,"varrayMinMaxMV");
-      strcpy(text,"DBL_IS_EQUAL    with isnan");
-      timing_report(routine, text);
+      timing_report(routine);
     }
 
     if ( do_vert_interp_lev ) {
@@ -496,35 +532,46 @@ int main (int argc, char *argv[]) {
         exit (1);
       }
       strcpy(routine,"vert_interp_lev");
-      strcpy(text,"                          ");
-      timing_report(routine, text);
+      timing_report(routine);
     }
   }
 
 }
 
-void timing_report (char routine[], char text[]) {
+void timing_report (char routine[]) {
 
+  char ctext[32];
+  char gtext[32];
 // Timing report
 
   if ( do_isnan && do_missval ) {
-    strcpy(text,"with    isnan, with    missval");
+    strcpy(ctext,"with    isnan, with    missval");
   }
   else if ( do_missval ) {
-    strcpy(text,"without isnan, with    missval");
+    strcpy(ctext,"without isnan, with    missval");
   }
   else {
-    strcpy(text,"without isnan, without missval");
+    strcpy(ctext,"without isnan, without missval");
+  }
+  strcpy(gtext,ctext);
+  if ( !strcmp(routine,"fft") ) {
+    if ( do_ffttype==FFT_FFTW ) {
+      strcpy(ctext,"using FFTW                    ");
+    }
+    if ( do_ffttype==FFT_INTERNAL ) {
+      strcpy(ctext,"using internal FFT            ");
+    }
+    strcpy(gtext,"using CUFFT                   ");
   }
 
   if ( singledata && !gpuonly ) 
-    printf ("%s, CPU, single, %s:  %f secs\n",routine,text,stimecpu);
+    printf ("%s, CPU, single, %s:  %f secs\n",routine,ctext,stimecpu);
   if ( singledata && !cpuonly ) 
-    printf ("%s, GPU, single, %s:  %f secs\n",routine,text,stimegpu);
+    printf ("%s, GPU, single, %s:  %f secs\n",routine,gtext,stimegpu);
   if ( doubledata && !gpuonly ) 
-    printf ("%s, CPU, double, %s:  %f secs\n",routine,text,dtimecpu);
+    printf ("%s, CPU, double, %s:  %f secs\n",routine,ctext,dtimecpu);
   if ( doubledata && !cpuonly ) 
-    printf ("%s, GPU, double, %s:  %f secs\n",routine,text,dtimegpu);
+    printf ("%s, GPU, double, %s:  %f secs\n",routine,gtext,dtimegpu);
 
   if ( timingdata ) {
     fprintf(file_handle,"%s %i %i %i %f %f %f %f\n",routine,nlev,nx,ny,
