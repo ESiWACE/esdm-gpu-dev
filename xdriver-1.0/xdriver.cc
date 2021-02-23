@@ -18,7 +18,12 @@
 #include "compare.h"
 #include "functions.h"
 
-int test_fft (float *sarray, double *darray, int &nx, int &ny, int &niter,
+int test_fft1d (float *sarray, double *darray, int &nx, int &ny, int &niter,
+         int &cpuonly, int &gpuonly, int &singledata, int &doubledata,
+         int &do_ffttype,
+         double *stimecpu, double *stimegpu, double *dtimecpu, double *dtimegpu);
+
+int test_fft2d (float *sarray, double *darray, int &nx, int &ny, int &niter,
          int &cpuonly, int &gpuonly, int &singledata, int &doubledata,
          int &do_ffttype,
          double *stimecpu, double *stimegpu, double *dtimecpu, double *dtimegpu);
@@ -49,9 +54,9 @@ int main (int argc, char *argv[]) {
   int errcount, i, ierr, irun, narray, niter, nrun, safety;
 //int debug;
   int errlimit, help, restart, timingrun, unknown;
-  int nlevmax, nxmax, nymax;
+  int size, sizemax;
   int *nlevrun, *nxrun, *nyrun;
-  int do_fft, do_varrayMinMaxMV, do_vert_interp_lev;
+  int do_fft1d, do_fft2d, do_varrayMinMaxMV, do_vert_interp_lev;
   double memusage;
   double *darray;
   float  *sarray;
@@ -112,7 +117,8 @@ int main (int argc, char *argv[]) {
   timingrun=0;
   do_isnan=1;
   do_missval=1;
-  do_fft=0;
+  do_fft1d=0;
+  do_fft2d=0;
   do_ffttype=FFT_FFTW;
   do_varrayMinMaxMV=0;
   do_vert_interp_lev=0;
@@ -159,8 +165,13 @@ int main (int argc, char *argv[]) {
       }
       unknown=0;
     }
-    if ( strlen(argv[i])==4 && !strcmp(argv[i],"-fft") ) {
-      do_fft=1;
+    if ( strlen(argv[i])==4 && !strcmp(argv[i],"-fft") ||
+         strlen(argv[i])==6 && !strcmp(argv[i],"-fft1d") ) {
+      do_fft1d=1;
+      unknown=0;
+    }
+    if ( strlen(argv[i])==6 && !strcmp(argv[i],"-fft2d") ) {
+      do_fft2d=1;
       unknown=0;
     }
     if ( strlen(argv[i])==5 && !strcmp(argv[i],"-ffti") ||
@@ -442,13 +453,10 @@ int main (int argc, char *argv[]) {
 
 // Find the maximum data sizes for array allocation
 
-  nlevmax = 0;
-  nxmax = 0;
-  nymax = 0;
+  sizemax = 0;
   for (irun=0;irun<nrun;irun++) {
-    if ( *(nlevrun+irun)>nlevmax ) nlevmax = *(nlevrun+irun);
-    if ( *(nxrun+irun)>nxmax ) nxmax = *(nxrun+irun);
-    if ( *(nyrun+irun)>nymax ) nymax = *(nyrun+irun);
+    size = (*(nlevrun+irun))*(*(nxrun+irun))*(*(nyrun+irun));
+    if ( size>sizemax ) sizemax = size;
   }
 
 // Allocate the main data arrays
@@ -457,22 +465,24 @@ int main (int argc, char *argv[]) {
   narray = 1;
   if ( do_vert_interp_lev ) narray = 2;
 // For FFTs we need two arrays of complex data
-  if ( do_fft ) narray = 4;
-  printf ("xdriver: allocating %i arrays %i x %i x %i\n",narray,nlevmax,nxmax,nymax);
+  if ( do_fft1d || do_fft2d ) narray = 4;
+  printf ("xdriver: allocating %i arrays of size %i\n",narray,sizemax);
   if ( doubledata ) {
-    memusage = safety*narray*nlevmax*nxmax*nymax*sizeof(double)/(1024.0*1024.0);
-    darray = (double*)malloc(safety*narray*nlevmax*nxmax*nymax*sizeof(double));
+    memusage = safety*narray*sizemax*sizeof(double)/(1024.0*1024.0);
+    darray = (double*)malloc(safety*narray*sizemax*sizeof(double));
     if ( darray == NULL ) {
       printf("Error: malloc failed to find %f MB\n",memusage);
+      exit(1);
     }
     // Share memory for the double and single precision arrays
     sarray = (float *) darray;
   }
   else if ( singledata ) {
-    memusage = safety*narray*nlevmax*nxmax*nymax*sizeof(float)/(1024.0*1024.0);
-    sarray = (float*)malloc(safety*narray*nlevmax*nxmax*nymax*sizeof(float));
+    memusage = safety*narray*sizemax*sizeof(float)/(1024.0*1024.0);
+    sarray = (float*)malloc(safety*narray*sizemax*sizeof(float));
     if ( sarray == NULL ) {
       printf("Error: malloc failed to find %f MB\n",memusage);
+      exit(1);
     }
   }
   else {
@@ -492,20 +502,33 @@ int main (int argc, char *argv[]) {
 
 //   Run tests as per the do_* flags
 
-    if ( !do_fft && !do_varrayMinMaxMV && !do_vert_interp_lev ) {
+    if ( !do_fft1d && !do_fft2d && !do_varrayMinMaxMV && !do_vert_interp_lev ) {
       printf("WARNING: no operator selected, see -help\n");
     }
 
-    if ( do_fft ) {
-      ierr = test_fft(sarray, darray, nx, ny, niter,
+    if ( do_fft1d ) {
+      ierr = test_fft1d(sarray, darray, nx, ny, niter,
           cpuonly, gpuonly, singledata, doubledata,
           do_ffttype,
           &stimecpu,&stimegpu,&dtimecpu,&dtimegpu);
       if ( ierr ) {
-        printf ("xdriver: test_fft failed due to errors, ierr = %i\n",ierr);
+        printf ("xdriver: test_fft1d failed due to errors, ierr = %i\n",ierr);
         exit (1);
       }
-      strcpy(routine,"fft");
+      strcpy(routine,"fft1d");
+      timing_report(routine);
+    }
+
+    if ( do_fft2d ) {
+      ierr = test_fft2d(sarray, darray, nx, ny, niter,
+          cpuonly, gpuonly, singledata, doubledata,
+          do_ffttype,
+          &stimecpu,&stimegpu,&dtimecpu,&dtimegpu);
+      if ( ierr ) {
+        printf ("xdriver: test_fft2d failed due to errors, ierr = %i\n",ierr);
+        exit (1);
+      }
+      strcpy(routine,"fft2d");
       timing_report(routine);
     }
 
@@ -554,7 +577,7 @@ void timing_report (char routine[]) {
     strcpy(ctext,"without isnan, without missval");
   }
   strcpy(gtext,ctext);
-  if ( !strcmp(routine,"fft") ) {
+  if ( !strcmp(routine,"fft1d") || !strcmp(routine,"fft2d") ) {
     if ( do_ffttype==FFT_FFTW ) {
       strcpy(ctext,"using FFTW                    ");
     }
