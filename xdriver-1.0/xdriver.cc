@@ -60,16 +60,18 @@ int main (int argc, char *argv[]) {
   double memusage;
   double *darray;
   float  *sarray;
-  char routine[STR_MAX_TEXT], text[STR_MAX_TEXT];
+  char routine[STR_MAX_TEXT], runstamp[STR_MAX_TEXT], text[STR_MAX_TEXT];
   char datafn[STR_MAX_FILENAME], restartfn[STR_MAX_FILENAME], timingfn[STR_MAX_FILENAME];
 
   memset(routine, '\0', sizeof(routine));
   memset(text, '\0', sizeof(text));
   memset(datafn, '\0', sizeof(datafn));
   memset(restartfn, '\0', sizeof(restartfn));
+  memset(runstamp, '\0', sizeof(restartfn));
   memset(timingfn, '\0', sizeof(timingfn));
 
-  printf ("xdriver: timing harness for CDO operators\n");
+  printf("=========================================================================");
+  printf ("Timing harness for CDO operators\n");
 
 // Read steering data from a restart file if present
 
@@ -124,6 +126,20 @@ int main (int argc, char *argv[]) {
   do_vert_interp_lev=0;
   memset(text, '\0', sizeof(text));
   memset(timingfn, '\0', sizeof(timingfn));
+
+// Make a stamp for the data output with system name, date and time
+
+  ierr = gethostname(runstamp,STR_MAX_TEXT);
+  time_t current_time = time(NULL);
+  struct tm *tm = localtime(&current_time);
+  i = strlen(runstamp);
+  runstamp[i] = ' ';
+  strftime(runstamp+i+1, sizeof(runstamp)-1, "%c", tm);
+
+// Announce the program
+
+  printf("Running xdriver on system %s\n",runstamp);
+  printf("=========================================================================");
 
 // Parse command arguments
 
@@ -436,6 +452,7 @@ int main (int argc, char *argv[]) {
     }
     else {
       timingdata = 1;
+      fprintf(file_handle,"%s\n",runstamp);
     }
   } // timingrun
   else {
