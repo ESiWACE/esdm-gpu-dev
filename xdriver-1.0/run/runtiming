@@ -1,0 +1,62 @@
+#!/bin/bash
+version="gcc"
+options="-niter 100"
+if [ "$1" == "--options" ]
+then
+  options="$options $2"
+fi
+#
+# Run the xdriver code generating output files
+# "skip" as first argument skips this
+#
+if [ "$1" != "--skip" ]
+then
+  for nx in 200 400 800 1600 3200 6400
+  do
+    for ny in 5000 6000 7000 8000
+    do
+      echo "Running xdriver-$version with nx= $nx ny = $ny $options"
+      ./xdriver-${version} -niter 100 -nx $nx -ny $ny $options > xdriver-$version-${nx}-${ny}.out
+    done
+  done
+  nx=8000
+  ny=8000
+  ./xdriver-${version} -niter 100 -nx $nx -ny $ny $options > xdriver-$version-${nx}-${ny}.out
+fi
+#
+# Extract data from files
+#
+rm -f runtiming-${version}.out
+for nx in 200 400 800 1600 3200 6400
+do
+  for ny in 5000 6000 7000 8000
+  do
+    cstime=`grep "CPU timing, single precision, DBL_IS_EQUAL    with isnan" xdriver-$version-${nx}-${ny}.out | awk '{print $8}'`
+    cdtime=`grep "CPU timing, double precision, DBL_IS_EQUAL    with isnan" xdriver-$version-${nx}-${ny}.out | awk '{print $8}'`
+    gstime=`grep "GPU timing, single precision, DBL_IS_EQUAL    with isnan" xdriver-$version-${nx}-${ny}.out | awk '{print $8}'`
+    gdtime=`grep "GPU timing, double precision, DBL_IS_EQUAL    with isnan" xdriver-$version-${nx}-${ny}.out | awk '{print $8}'`
+
+    cstimeno=`grep "CPU timing, single precision, DBL_IS_EQUAL without isnan" xdriver-$version-${nx}-${ny}.out | awk '{print $8}'`
+    cdtimeno=`grep "CPU timing, double precision, DBL_IS_EQUAL without isnan" xdriver-$version-${nx}-${ny}.out | awk '{print $8}'`
+    gstimeno=`grep "GPU timing, single precision, DBL_IS_EQUAL without isnan" xdriver-$version-${nx}-${ny}.out | awk '{print $8}'`
+    gdtimeno=`grep "GPU timing, double precision, DBL_IS_EQUAL without isnan" xdriver-$version-${nx}-${ny}.out | awk '{print $8}'`
+
+    echo "$nx $ny $cstime $cdtime $gstime $gdtime $cstimeno $cdtimeno $gstimeno $gdtimeno" \
+      >> runtiming-${version}.out
+  done
+done
+nx=8000
+ny=8000
+    cstime=`grep "CPU timing, single precision, DBL_IS_EQUAL    with isnan" xdriver-$version-${nx}-${ny}.out | awk '{print $8}'`
+    cdtime=`grep "CPU timing, double precision, DBL_IS_EQUAL    with isnan" xdriver-$version-${nx}-${ny}.out | awk '{print $8}'`
+    gstime=`grep "GPU timing, single precision, DBL_IS_EQUAL    with isnan" xdriver-$version-${nx}-${ny}.out | awk '{print $8}'`
+    gdtime=`grep "GPU timing, double precision, DBL_IS_EQUAL    with isnan" xdriver-$version-${nx}-${ny}.out | awk '{print $8}'`
+
+    cstimeno=`grep "CPU timing, single precision, DBL_IS_EQUAL without isnan" xdriver-$version-${nx}-${ny}.out | awk '{print $8}'`
+    cdtimeno=`grep "CPU timing, double precision, DBL_IS_EQUAL without isnan" xdriver-$version-${nx}-${ny}.out | awk '{print $8}'`
+    gstimeno=`grep "GPU timing, single precision, DBL_IS_EQUAL without isnan" xdriver-$version-${nx}-${ny}.out | awk '{print $8}'`
+    gdtimeno=`grep "GPU timing, double precision, DBL_IS_EQUAL without isnan" xdriver-$version-${nx}-${ny}.out | awk '{print $8}'`
+
+    echo "$nx $ny $cstime $cdtime $gstime $gdtime $cstimeno $cdtimeno $gstimeno $gdtimeno" \
+      >> runtiming-${version}.out
+exit
