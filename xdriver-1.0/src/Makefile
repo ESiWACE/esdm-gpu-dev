@@ -12,6 +12,8 @@ OBJS = xdriver.o test_fft1d.o test_fft2d.o test_varrayMinMaxMV.o test_vert_inter
        array.o fft.o interpolation.o \
        dev_array.o dev_interpolation.o
 INCS = compare.h functions.h xd_timer.h
+EXENAME = xdriver
+EXEDIR = ../run
 
 include $(TARGET).make
 
@@ -49,13 +51,13 @@ pgi-acc-debug:
 	$(CUCC) -c $(CUFLAGS) -o $@ $<
 
 build:	$(OBJS)
-	$(CC) $(LDFLAGS) -o xdriver-$(TARGET) $(OBJS) $(LIBDIR) $(LIBS)
+	$(CC) $(LDFLAGS) -o $(EXEDIR)/$(EXENAME)-$(TARGET) $(OBJS) $(LIBDIR) $(LIBS)
 
 clean:
 	rm -f $(OBJS)
 
 cleanall:
-	rm -f $(OBJS) xdriver-*
+	rm -f $(OBJS) $(EXEDIR)/$(EXENAME)-*
 
 # Dependencies
 array.o:			compare.h
