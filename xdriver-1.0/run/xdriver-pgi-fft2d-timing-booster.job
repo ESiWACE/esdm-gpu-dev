@@ -1,0 +1,17 @@
+#!/bin/bash
+#SBATCH --job-name=fft2d
+#SBATCH --account=PRPB93
+#SBATCH --nodes=1
+#SBATCH --ntasks=1
+#SBATCH --ntasks-per-node=1
+#SBATCH --partition=booster
+#SBATCH --gres=gpu:1
+#SBATCH --output=xdriver-pgi-fft2d-timing.out
+#SBATCH --error=xdriver-pgi-fft2d-timing.out
+#SBATCH --time=00:15:00
+pwd
+export PATH=/p/software/juwelsbooster/stages/2020/software/NVHPC/20.11-GCC-9.3.0/Linux_x86_64/20.11/compilers/bin:/p/software/juwelsbooster/stages/2020/software/CUDA/11.0/bin:$PATH
+export LD_LIBRARY_PATH=/p/software/juwelsbooster/stages/2020/software/NVHPC/20.11-GCC-9.3.0/Linux_x86_64/20.11/compilers/lib:/p/software/juwelsbooster/stages/2020/software/NVHPC/20.11-GCC-9.3.0/Linux_x86_64/20.11/math_libs/11.0/targets/x86_64-linux/lib:/p/software/juwelsbooster/stages/2020/software/FFTW/3.3.8-GCCcore-9.3.0-nompi/lib:$LD_LIBRARY_PATH
+srun --exclusive ./xdriver-pgi-acc -fft2d -niter 10 -single -t timing_fft2d_input_all.txt -to timing_pgi_fft2d_output_booster.txt
+wait
+

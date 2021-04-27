@@ -20,12 +20,12 @@
 
 int test_fft1d (float *sarray, double *darray, int &nx, int &ny, int &niter,
          int &cpuonly, int &gpuonly, int &singledata, int &doubledata,
-         int &do_ffttype,
+         int &do_ffttype, int &ngpu,
          double *stimecpu, double *stimegpu, double *dtimecpu, double *dtimegpu);
 
 int test_fft2d (float *sarray, double *darray, int &nx, int &ny, int &niter,
          int &cpuonly, int &gpuonly, int &singledata, int &doubledata,
-         int &do_ffttype,
+         int &do_ffttype, int &ngpu,
          double *stimecpu, double *stimegpu, double *dtimecpu, double *dtimegpu);
 
 int test_varrayMinMaxMV (float *sarray, double *darray, int &nx, int &ny, int &niter,
@@ -51,7 +51,7 @@ FILE *file_handle;
 int main (int argc, char *argv[]) {
 
 // Local variables
-  int errcount, i, ierr, irun, narray, niter, nrun, safety;
+  int errcount, i, ierr, irun, narray, ngpu, niter, nrun, safety;
 //int debug;
   int errlimit, help, restart, timingrun, unknown;
   int size, sizemax;
@@ -60,18 +60,16 @@ int main (int argc, char *argv[]) {
   double memusage;
   double *darray;
   float  *sarray;
-  char routine[STR_MAX_TEXT], runstamp[STR_MAX_TEXT], text[STR_MAX_TEXT];
+  char routine[STR_MAX_TEXT], text[STR_MAX_TEXT];
   char datafn[STR_MAX_FILENAME], restartfn[STR_MAX_FILENAME], timingfn[STR_MAX_FILENAME];
 
   memset(routine, '\0', sizeof(routine));
   memset(text, '\0', sizeof(text));
   memset(datafn, '\0', sizeof(datafn));
   memset(restartfn, '\0', sizeof(restartfn));
-  memset(runstamp, '\0', sizeof(restartfn));
   memset(timingfn, '\0', sizeof(timingfn));
 
-  printf("=========================================================================");
-  printf ("Timing harness for CDO operators\n");
+  printf ("xdriver: timing harness for CDO operators\n");
 
 // Read steering data from a restart file if present
 
@@ -101,7 +99,7 @@ int main (int argc, char *argv[]) {
   ny = 500;
   doubledata=1;
   singledata=0;
-
+  ngpu=1;
   cpuonly=0;
   gpuonly=0;
 /*
@@ -126,20 +124,6 @@ int main (int argc, char *argv[]) {
   do_vert_interp_lev=0;
   memset(text, '\0', sizeof(text));
   memset(timingfn, '\0', sizeof(timingfn));
-
-// Make a stamp for the data output with system name, date and time
-
-  ierr = gethostname(runstamp,STR_MAX_TEXT);
-  time_t current_time = time(NULL);
-  struct tm *tm = localtime(&current_time);
-  i = strlen(runstamp);
-  runstamp[i] = ' ';
-  strftime(runstamp+i+1, sizeof(runstamp)-1, "%c", tm);
-
-// Announce the program
-
-  printf("Running xdriver on system %s\n",runstamp);
-  printf("=========================================================================");
 
 // Parse command arguments
 
@@ -224,6 +208,21 @@ int main (int argc, char *argv[]) {
         ierr = sscanf(argv[i],"%i",&nlev);
         if ( ierr!=1 ) {
           printf("Error in \"-nlev\" parameter: invalid number %s\n",argv[i]);
+          errcount++;
+        }
+      }
+      unknown=0;
+    }
+    if ( strlen(argv[i])==5 && !strcmp(argv[i],"-ngpu") ) {
+      if ( i+1>argc-1 ) {
+        printf("Error in \"-ngpu\" parameter: number of GPUs missing\n");
+        errcount++;
+      }
+      else {
+        i++;
+        ierr = sscanf(argv[i],"%i",&ngpu);
+        if ( ierr!=1 ) {
+          printf("Error in \"-ngpu\" parameter: invalid number %s\n",argv[i]);
           errcount++;
         }
       }
@@ -452,7 +451,6 @@ int main (int argc, char *argv[]) {
     }
     else {
       timingdata = 1;
-      fprintf(file_handle,"%s\n",runstamp);
     }
   } // timingrun
   else {
@@ -475,6 +473,7 @@ int main (int argc, char *argv[]) {
     size = (*(nlevrun+irun))*(*(nxrun+irun))*(*(nyrun+irun));
     if ( size>sizemax ) sizemax = size;
   }
+  printf("sizemax = %i\n",sizemax);
 
 // Allocate the main data arrays
 
@@ -526,7 +525,7 @@ int main (int argc, char *argv[]) {
     if ( do_fft1d ) {
       ierr = test_fft1d(sarray, darray, nx, ny, niter,
           cpuonly, gpuonly, singledata, doubledata,
-          do_ffttype,
+          do_ffttype, ngpu,
           &stimecpu,&stimegpu,&dtimecpu,&dtimegpu);
       if ( ierr ) {
         printf ("xdriver: test_fft1d failed due to errors, ierr = %i\n",ierr);
@@ -539,7 +538,7 @@ int main (int argc, char *argv[]) {
     if ( do_fft2d ) {
       ierr = test_fft2d(sarray, darray, nx, ny, niter,
           cpuonly, gpuonly, singledata, doubledata,
-          do_ffttype,
+          do_ffttype, ngpu,
           &stimecpu,&stimegpu,&dtimecpu,&dtimegpu);
       if ( ierr ) {
         printf ("xdriver: test_fft2d failed due to errors, ierr = %i\n",ierr);

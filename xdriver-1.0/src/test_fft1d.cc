@@ -23,10 +23,11 @@ extern void sDestroyCUFFT();
 extern void dPlan1dCUFFT(int fftsize, void *stream);
 extern void dExecCUFFT(double *darray);
 extern void dDestroyCUFFT();
+//extern void sMulti2dCUFFT(int nx, int ny, float *sarray2, int ngpu);
 
 int test_fft1d (float *sarray, double *darray, int &nx, int &lot, int &niter,
     int &cpuonly, int &gpuonly, int &singledata, int &doubledata,
-    int &ffttype,
+    int &ffttype, int &ngpu,
     double *stimecpu, double *stimegpu, double *dtimecpu, double *dtimegpu) {
 
   int i, ierr, iter;
@@ -165,23 +166,46 @@ int test_fft1d (float *sarray, double *darray, int &nx, int &lot, int &niter,
       }
 
 #ifdef USE_CUDA
-      // Query OpenACC for CUDA stream
-      void *stream = acc_get_cuda_stream(acc_async_sync);
-      sPlan1dCUFFT(fftsize, stream);
+/*
+      if ( ngpu==1 ) {
+        // Single GPU code
+*/
 
-      start = TIMER_FUNCTION;
-      for (iter=0;iter<niter;iter++ ) {
+        // Query OpenACC for CUDA stream
+        void *stream = acc_get_cuda_stream(acc_async_sync);
+        sPlan1dCUFFT(fftsize, stream);
+
+        start = TIMER_FUNCTION;
+        for (iter=0;iter<niter;iter++ ) {
 // Copy data to device at start of region and back to host and end of region
 #pragma acc data copy(sarray2[0:fftdatasize])
 // Inside this region the device data pointer will be used
 #pragma acc host_data use_device(sarray2)
-        {
-          sExecCUFFT(sarray2);
+          {
+            sExecCUFFT(sarray2);
+          }
         }
-      }
-      end = TIMER_FUNCTION;
+        end = TIMER_FUNCTION;
 
-      sDestroyCUFFT();
+        sDestroyCUFFT();
+/*
+      }
+      else {
+        // Multiple GPU code
+
+        start = TIMER_FUNCTION;
+        for (iter=0;iter<niter;iter++ ) {
+// Copy data to device at start of region and back to host and end of region
+#pragma acc data copy(sarray2[0:fftdatasize])
+// Inside this region the device data pointer will be used
+#pragma acc host_data use_device(sarray2)
+          {
+            sMulti2dCUFFT(nx, ny, sarray2, ngpu);
+          }
+        }
+        end = TIMER_FUNCTION;
+      }
+*/
 #endif
 
       if ( niter==1 && fftsize<=64 ) {

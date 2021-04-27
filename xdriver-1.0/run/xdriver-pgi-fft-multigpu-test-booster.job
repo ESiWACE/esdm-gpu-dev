@@ -1,0 +1,50 @@
+#!/bin/bash
+#SBATCH --job-name=fftmulti
+#SBATCH --account=PRPB93
+#SBATCH --nodes=1
+#SBATCH --ntasks=1
+#SBATCH --ntasks-per-node=1
+#SBATCH --partition=booster
+#SBATCH --gres=gpu:4
+#SBATCH --output=xdriver-pgi-fft-multigpu-test.out
+#SBATCH --error=xdriver-pgi-fft-multigpu-test.out
+#SBATCH --time=00:15:00
+pwd
+export PATH=/p/software/juwelsbooster/stages/2020/software/NVHPC/20.11-GCC-9.3.0/Linux_x86_64/20.11/compilers/bin:/p/software/juwelsbooster/stages/2020/software/CUDA/11.0/bin:$PATH
+export LD_LIBRARY_PATH=/p/software/juwelsbooster/stages/2020/software/NVHPC/20.11-GCC-9.3.0/Linux_x86_64/20.11/compilers/lib:/p/software/juwelsbooster/stages/2020/software/NVHPC/20.11-GCC-9.3.0/Linux_x86_64/20.11/math_libs/11.0/targets/x86_64-linux/lib:/p/software/juwelsbooster/stages/2020/software/FFTW/3.3.8-GCCcore-9.3.0-nompi/lib:$LD_LIBRARY_PATH
+#
+cat > test << EOF
+10
+1 4096 4096
+1 4096 4096
+1 4096 4096
+1 4096 4096
+1 4096 4096
+1 8192 8192
+1 8192 8192
+1 8192 8192
+1 8192 8192
+1 8192 8192
+test.out
+EOF
+#
+# Device 0
+echo Device 0 -----------------------------------------------------------------------
+export CUDA_VISIBLE_DEVICES=0
+rm -f fft2d-gpu1-output.txt
+srun --exclusive -n1 -G1 ./xdriver-pgi-acc -fft2d -niter 100 -single -nodouble -gpuonly -t test -ngpu 1 -to fft2d-gpu1-output.txt
+#
+# Devices 0,2
+echo Devices 0,2 --------------------------------------------------------------------
+export CUDA_VISIBLE_DEVICES=0,2
+rm -f fft2d-gpu2-output.txt
+srun --exclusive -n1 -G2 ./xdriver-pgi-acc -fft2d -niter 100 -single -nodouble -gpuonly -t test -ngpu 2 -to fft2d-gpu2-output.txt
+#
+# Devices 0,1,2,3
+echo Devices 0,1,2,3 ----------------------------------------------------------------
+export CUDA_VISIBLE_DEVICES=0,1,2,3
+rm -f fft2d-gpu4-output.txt
+srun --exclusive -n1 -G4 ./xdriver-pgi-acc -fft2d -niter 100 -single -nodouble -gpuonly -t test -ngpu 4 -to fft2d-gpu4-output.txt
+rm test
+wait
+

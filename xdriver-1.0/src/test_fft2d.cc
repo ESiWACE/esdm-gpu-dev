@@ -15,6 +15,7 @@
 #endif
 
 // Forward declaration of wrapper functions that will call CUFFT
+extern void sMulti2dCUFFT(int nx, int ny, float *sarray2, int ngpu);
 //extern void sLaunchCUFFT(float *d_data, int n, void *stream);
 extern void sPlan2dCUFFT(int nx, int ny, void *stream);
 extern void sExecCUFFT(float *sarray);
@@ -26,7 +27,7 @@ extern void dDestroyCUFFT();
 
 int test_fft2d (float *sarray, double *darray, int &nx, int &ny, int &niter,
     int &cpuonly, int &gpuonly, int &singledata, int &doubledata,
-    int &ffttype,
+    int &ffttype, int &ngpu,
     double *stimecpu, double *stimegpu, double *dtimecpu, double *dtimegpu) {
 
   int i, ierr, iter, j;
@@ -167,25 +168,53 @@ int test_fft2d (float *sarray, double *darray, int &nx, int &ny, int &niter,
         }
       }
 
+      if ( ngpu==1 ) {
 #ifdef USE_CUDA
-      // Query OpenACC for CUDA stream
-      void *stream = acc_get_cuda_stream(acc_async_sync);
-      sPlan2dCUFFT(nx, ny, stream);
+        // Single GPU code
 
-      start = TIMER_FUNCTION;
-      for (iter=0;iter<niter;iter++ ) {
+        // Query OpenACC for CUDA stream
+        void *stream = acc_get_cuda_stream(acc_async_sync);
+        sPlan2dCUFFT(nx, ny, stream);
+
+        start = TIMER_FUNCTION;
+        for (iter=0;iter<niter;iter++ ) {
 // Copy data to device at start of region and back to host and end of region
 #pragma acc data copy(sarray2[0:fftdatasize])
 // Inside this region the device data pointer will be used
 #pragma acc host_data use_device(sarray2)
-        {
-          sExecCUFFT(sarray2);
+          {
+            sExecCUFFT(sarray2);
+          }
         }
-      }
-      end = TIMER_FUNCTION;
+        end = TIMER_FUNCTION;
 
-      sDestroyCUFFT();
+        sDestroyCUFFT();
 #endif
+      }
+      else {
+#ifdef USE_CUDA
+        // Multiple GPU code
+
+        start = TIMER_FUNCTION;
+        for (iter=0;iter<niter;iter++ ) {
+          sMulti2dCUFFT(nx, ny, sarray2, ngpu);
+        }
+        end = TIMER_FUNCTION;
+/*
+        start = TIMER_FUNCTION;
+        for (iter=0;iter<niter;iter++ ) {
+// Copy data to device at start of region and back to host and end of region
+#pragma acc data copy(sarray2[0:fftdatasize])
+// Inside this region the device data pointer will be used
+#pragma acc host_data use_device(sarray2)
+          {
+            sMulti2dCUFFT(nx, ny, sarray2, ngpu);
+          }
+        }
+        end = TIMER_FUNCTION;
+*/
+#endif
+      }
 
       if ( niter==1 && nx*ny<=64 ) {
         printf("GPU single after\n");
@@ -311,6 +340,7 @@ int test_fft2d (float *sarray, double *darray, int &nx, int &ny, int &niter,
 
     if ( !cpuonly ) {
 
+#ifdef USE_CUDA
 //    Reset the input data for the next transform
       memcpy(darray2,darray1,sizeof(darray1)*fftdatasize);
 
@@ -322,7 +352,6 @@ int test_fft2d (float *sarray, double *darray, int &nx, int &ny, int &niter,
         }
       }
 
-#ifdef USE_CUDA
       // Query OpenACC for CUDA stream
       void *stream = acc_get_cuda_stream(acc_async_sync);
       dPlan2dCUFFT(nx, ny, stream);
@@ -340,7 +369,6 @@ int test_fft2d (float *sarray, double *darray, int &nx, int &ny, int &niter,
       end = TIMER_FUNCTION;
 
       dDestroyCUFFT();
-#endif
 
       if ( niter==1 && nx*ny<=64 ) {
         printf("GPU double after\n");
@@ -370,6 +398,7 @@ int test_fft2d (float *sarray, double *darray, int &nx, int &ny, int &niter,
         if ( ffttype==FFT_FFTW ) freq=freq/2;
         printf ("fft, GPU, double,                 frequency : %i\n",freq);
       }
+#endif
     }
 
   }

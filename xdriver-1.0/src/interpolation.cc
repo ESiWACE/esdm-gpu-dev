@@ -2,6 +2,7 @@
 #include <iostream>
 #include "compare.h"
 
+#pragma acc routine
 static float
 s_vert_interp_lev_kernel(float w1, float w2, float var1L1, float var1L2, float missval)
 {
@@ -30,6 +31,7 @@ s_vert_interp_lev_kernel(float w1, float w2, float var1L1, float var1L2, float m
   return var2;
 }
 
+#pragma acc routine
 static float
 s_vert_interp_lev_kernel_noisnan(float w1, float w2, float var1L1, float var1L2, float missval)
 {
@@ -58,12 +60,14 @@ s_vert_interp_lev_kernel_noisnan(float w1, float w2, float var1L1, float var1L2,
   return var2;
 }
 
+#pragma acc routine
 static float
 s_vert_interp_lev_kernel_nomissval(float w1, float w2, float var1L1, float var1L2, float missval)
 {
   return var1L1 * w1 + var1L2 * w2;
 }
 
+#pragma acc routine
 static double
 d_vert_interp_lev_kernel(double w1, double w2, double var1L1, double var1L2, double missval)
 {
@@ -92,6 +96,7 @@ d_vert_interp_lev_kernel(double w1, double w2, double var1L1, double var1L2, dou
   return var2;
 }
 
+#pragma acc routine
 static double
 d_vert_interp_lev_kernel_noisnan(double w1, double w2, double var1L1, double var1L2, double missval)
 {
@@ -120,6 +125,7 @@ d_vert_interp_lev_kernel_noisnan(double w1, double w2, double var1L1, double var
   return var2;
 }
 
+#pragma acc routine
 static double
 d_vert_interp_lev_kernel_nomissval(double w1, double w2, double var1L1, double var1L2, double missval)
 {
